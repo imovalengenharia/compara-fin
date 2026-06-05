@@ -133,53 +133,34 @@ async def identificar(request: Request, arquivos: list[UploadFile] = File(defaul
 @app.post("/api/analisar")
 async def analisar(
     request: Request,
-    cd_foco: str = Form(""),        # opcional: só se a identificação automática falhar
-    cd_comp: str = Form(""),        # idem, separado por vírgula
+    cd_foco: str = Form(""),        # código da empresa em foco (já identificado no anexo)
+    cd_comp: str = Form(""),        # códigos das comparáveis, separados por vírgula
     ano: str = Form("2025"),
     ano_ant: str = Form("2024"),
-    arquivos_foco: list[UploadFile] = File(default=[]),
-    arquivos_comp: list[UploadFile] = File(default=[]),
 ):
-    """Identifica as empresas pelos PDFs enviados e roda o motor.
-    Os números vêm da base CVM (confiáveis); o PDF serve para identificar a empresa.
-    cd_foco/cd_comp são usados apenas como fallback se a identificação falhar."""
+    """Roda o motor sobre os códigos CVM já identificados. NÃO reprocessa PDFs
+    (a identificação já ocorreu no /api/identificar quando o arquivo foi anexado).
+    Assim a análise é instantânea — só consulta a base CVM e calcula."""
     if not usuario_logado(request):
         return JSONResponse({"erro": "não autenticado"}, status_code=401)
 
-    # 1) identificar empresa em foco
-    cd_f, info_f = await _salva_e_identifica(arquivos_foco)
-    if not cd_f and cd_foco.strip():
-        cd_f = cd_foco.strip()
+    cd_f = cd_foco.strip()
     if not cd_f:
-        return JSONResponse({"erro": "Não identifiquei a empresa em foco pelos arquivos. "
-                             "Confirme o código CVM."}, status_code=400)
+        return JSONResponse({"erro": "Empresa em foco não identificada. Confirme o código CVM."}, status_code=400)
 
-    # 2) identificar comparáveis (cada arquivo pode ser uma empresa)
     cds_comp = []
-    import identificador
-    for f in arquivos_comp or []:
-        if f and f.filename and f.filename.lower().endswith(".pdf"):
-            destino = UPLOAD_DIR / f.filename
-            if not destino.exists():
-                destino.write_bytes(await f.read())
-            r = identificador.identifica_empresa(destino)
-            if r and r["cd_cvm"] not in cds_comp and r["cd_cvm"] != cd_f:
-                cds_comp.append(r["cd_cvm"])
-    # fallback: códigos digitados
     for c in [c.strip() for c in cd_comp.split(",") if c.strip()]:
         if c not in cds_comp and c != cd_f:
             cds_comp.append(c)
     if not cds_comp:
-        return JSONResponse({"erro": "Não identifiquei nenhuma empresa comparável pelos arquivos. "
-                             "Confirme o(s) código(s) CVM."}, status_code=400)
+        return JSONResponse({"erro": "Nenhuma empresa comparável identificada. Confirme o(s) código(s) CVM."}, status_code=400)
 
-    # 3) rodar o motor
     resultado = {"foco": None, "comparaveis": [], "alertas": []}
     try:
         rf = motor.analisa(cd_f, ano, ano_ant)
         resultado["foco"] = _serializa(cd_f, rf)
         if not rf["fechamento_ok"]:
-            resultado["alertas"].append(f"Balanço da empresa em foco não fecha.")
+            resultado["alertas"].append("Balanço da empresa em foco não fecha.")
     except Exception as e:
         return JSONResponse({"erro": f"Falha ao analisar empresa em foco ({cd_f}): {e}"}, status_code=400)
 
