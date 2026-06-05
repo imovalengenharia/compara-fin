@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Compara·Fin · Nova Análise</title>
+<style>
+:root{--bg:#f5f5f2;--ink:#1a1a1a;--muted:#5a6170;--line:#e2ddd6;--brand:#0d3b66;--brand-2:#1e6091;--accent:#e85d04;--accent-soft:#fff1e6;--good:#137333;--bad:#b3261e;--card:#fff;--shadow:0 1px 3px rgba(0,0,0,.05),0 4px 20px rgba(0,0,0,.06)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--ink);font:15px/1.6 "Helvetica Neue",Arial,sans-serif}
+.wrap{max-width:980px;margin:0 auto;padding:0 24px 80px}
+.topbar{display:flex;justify-content:space-between;align-items:center;padding:18px 0;border-bottom:1px solid var(--line);margin-bottom:48px}
+.brand{font-weight:700;font-size:16px;color:var(--brand)}.brand span{color:var(--accent)}
+.user{font-size:13px;color:var(--muted)}.user a{margin-left:16px;color:var(--brand-2)}
+.hero{text-align:center;padding:20px 0 44px}
+.hero .eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);font-weight:700;margin-bottom:16px}
+.hero h1{font-size:34px;line-height:1.15;letter-spacing:-.6px;color:var(--brand);max-width:720px;margin:0 auto 18px}
+.hero p.lead{font-size:17px;color:var(--muted);max-width:660px;margin:0 auto}
+.how{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin:0 0 50px}
+.step{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:22px 20px;box-shadow:var(--shadow)}
+.num{width:28px;height:28px;border-radius:50%;background:var(--brand);color:#fff;font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;margin-bottom:12px}
+.step h3{font-size:15px;color:var(--brand);margin-bottom:6px}.step p{font-size:13.5px;color:var(--muted)}
+h2.sec{font-size:24px;color:var(--brand);text-align:center;margin-bottom:8px}
+.sub{text-align:center;color:var(--muted);max-width:620px;margin:0 auto 30px}
+.uploads{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.card{background:var(--card);border:2px dashed var(--line);border-radius:14px;padding:28px 24px;text-align:center;transition:.2s}
+.card.foco{border-color:var(--accent);background:var(--accent-soft)}
+.card .badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:4px 12px;border-radius:999px;margin-bottom:14px}
+.card.foco .badge{background:var(--accent);color:#fff}.card.comp .badge{background:var(--brand);color:#fff}
+.card h3{font-size:17px;color:var(--brand);margin-bottom:14px}
+.card label.fld{display:block;text-align:left;font-size:13px;font-weight:600;margin:12px 0 5px;color:var(--ink)}
+.card input,.card select{width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 11px;font-size:14px;font-family:inherit;outline:none}
+.card input:focus,.card select:focus{border-color:var(--accent)}
+.card .filebtn{display:inline-block;margin-top:14px;background:transparent;border:1px solid var(--line);color:var(--brand);padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit}
+.card .filelist{margin-top:10px;font-size:12px;color:var(--good);text-align:left}
+.card .filelist div{padding:2px 0}
+.comp-list{margin-top:10px;text-align:left}
+.comp-tag{display:inline-flex;align-items:center;gap:6px;background:#eef2f7;color:var(--brand);font-size:13px;padding:5px 10px;border-radius:999px;margin:3px}
+.comp-tag b{cursor:pointer;opacity:.6}
+.formats{text-align:center;font-size:13px;color:var(--muted);margin-top:22px}
+.cta-row{text-align:center;margin-top:34px}
+.cta{background:var(--brand);color:#fff;border:none;padding:14px 38px;border-radius:10px;font-size:16px;font-weight:600;cursor:pointer;font-family:inherit;box-shadow:var(--shadow);transition:.2s}
+.cta:hover{filter:brightness(1.08)}.cta:disabled{background:#b8bcc4;cursor:not-allowed}
+.resultado{margin-top:40px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:28px 30px;box-shadow:var(--shadow);display:none}
+.resultado.show{display:block}
+.resultado h3{color:var(--brand);margin-bottom:14px}
+table{width:100%;border-collapse:collapse;margin-top:10px;font-size:13px}
+th,td{padding:7px 10px;border-bottom:1px solid var(--line);text-align:right}
+th:first-child,td:first-child{text-align:left}
+th{background:var(--brand);color:#fff;font-weight:600}
+td.foco{font-weight:700;color:var(--accent)}
+.alerta{background:#fff3e0;border-left:3px solid var(--accent);padding:10px 14px;border-radius:0 6px 6px 0;font-size:13px;margin-top:14px}
+.loading{text-align:center;color:var(--muted);padding:20px}
+
+.ident{margin-top:12px;font-size:13px;text-align:left;min-height:18px}
+.ident-loading{color:var(--muted)}
+.ident-ok{display:block;color:var(--good);font-weight:600}
+.ident-meta{display:block;color:var(--muted);font-size:11px;margin-top:2px}
+.ident-warn{color:var(--accent);font-weight:600}
+.conf{margin-top:12px;text-align:left}
+.conf .fld{font-size:12px;color:var(--accent)}
+@media(max-width:760px){.how,.uploads{grid-template-columns:1fr}}
+</style></head><body><div class="wrap">
+
+<div class="topbar">
+  <div class="brand">Compara<span>·</span>Fin</div>
+  <div class="user">Olá, {{USER}} <a href="/logout">Sair</a></div>
+</div>
+
+<div class="hero">
+  <div class="eyebrow">Análise Financeira Comparativa</div>
+  <h1>Compare empresas sob uma régua contábil única, com cada número rastreável à fonte</h1>
+  <p class="lead">Informe a empresa em foco e as comparáveis. O motor recalcula todos os indicadores a partir dos demonstrativos, valida o fechamento do balanço e gera o comparativo.</p>
+</div>
+
+<div class="how">
+  <div class="step"><div class="num">1</div><h3>Defina as empresas</h3><p>Empresa em foco e comparáveis, por código CVM. Anexe os demonstrativos em PDF/planilha quando quiser.</p></div>
+  <div class="step"><div class="num">2</div><h3>O motor calcula e valida</h3><p>Régua única sobre os demonstrativos. O balanço precisa fechar; divergências são sinalizadas.</p></div>
+  <div class="step"><div class="num">3</div><h3>Receba o comparativo</h3><p>Liquidez, endividamento, rentabilidade e margens das empresas, lado a lado.</p></div>
+</div>
+
+<h2 class="sec">Iniciar uma nova análise</h2>
+<p class="sub">No protótipo, as empresas são identificadas pelo código CVM. Os arquivos enviados ficam guardados para a futura leitura automática de PDF.</p>
+
+<div class="uploads">
+  <div class="card foco">
+    <div class="badge">Empresa em foco</div>
+    <h3>Empresa principal</h3>
+    <p style="font-size:13.5px;color:var(--muted);margin-bottom:6px">Anexe os demonstrativos financeiros. A empresa é identificada automaticamente.</p>
+    <button class="filebtn" type="button" onclick="document.getElementById('f-foco').click()">Anexar demonstrativos</button>
+    <input type="file" id="f-foco" multiple accept=".pdf,.xlsx,.csv" style="display:none" onchange="anexou('foco')">
+    <div class="filelist" id="l-foco"></div>
+    <div id="ident-foco" class="ident"></div>
+    <div id="conf-foco" class="conf" style="display:none">
+      <label class="fld">Não identifiquei — confirme o código CVM</label>
+      <input type="text" id="cd-foco" placeholder="ex.: 014460" oninput="checar()">
+    </div>
+  </div>
+
+  <div class="card comp">
+    <div class="badge">Empresas comparativas</div>
+    <h3>Concorrentes / pares</h3>
+    <p style="font-size:13.5px;color:var(--muted);margin-bottom:6px">Anexe os demonstrativos de uma ou mais empresas. Cada uma é identificada automaticamente.</p>
+    <button class="filebtn" type="button" onclick="document.getElementById('f-comp').click()">Anexar demonstrativos</button>
+    <input type="file" id="f-comp" multiple accept=".pdf,.xlsx,.csv" style="display:none" onchange="anexou('comp')">
+    <div class="filelist" id="l-comp"></div>
+    <div id="ident-comp" class="ident"></div>
+    <div id="conf-comp" class="conf" style="display:none">
+      <label class="fld">Não identifiquei — confirme o(s) código(s) CVM (separados por vírgula)</label>
+      <input type="text" id="cd-comp" placeholder="ex.: 020605, 020524" oninput="checar()">
+    </div>
+  </div>
+</div>
+
+<p class="formats">Formatos aceitos: PDF (DFP/ITR), planilhas XLSX e CSV da CVM Dados Abertos.</p>
+
+<div class="cta-row">
+  <button class="cta" id="cta" disabled onclick="analisar()">Gerar análise</button>
+</div>
+
+<div class="resultado" id="resultado"></div>
+
+</div>
+<script>
+var identFoco = null;       // {cd, nome} se identificada
+var identComp = [];         // lista de {cd, nome}
+
+function listarArquivos(inputId, alvoId){
+  var input = document.getElementById(inputId);
+  var alvo = document.getElementById(alvoId); alvo.innerHTML='';
+  for(var i=0;i<input.files.length;i++){
+    var d=document.createElement('div'); d.textContent='✓ '+input.files[i].name; alvo.appendChild(d);
+  }
+}
+
+async function anexou(lado){
+  var inputId = lado==='foco' ? 'f-foco' : 'f-comp';
+  var listId  = lado==='foco' ? 'l-foco' : 'l-comp';
+  var identId = lado==='foco' ? 'ident-foco' : 'ident-comp';
+  var confId  = lado==='foco' ? 'conf-foco' : 'conf-comp';
+  listarArquivos(inputId, listId);
+
+  var input = document.getElementById(inputId);
+  if(input.files.length===0) return;
+
+  var ident = document.getElementById(identId);
+  ident.innerHTML = '<span class="ident-loading">Identificando empresa…</span>';
+
+  // envia os arquivos para identificação
+  var fd = new FormData();
+  for(var i=0;i<input.files.length;i++) fd.append('arquivos', input.files[i]);
+  try{
+    var r = await fetch('/api/identificar',{method:'POST',body:fd});
+    var d = await r.json();
+    if(d.ok){
+      if(lado==='foco'){ identFoco = {cd:d.cd_cvm, nome:d.nome}; }
+      else { if(!identComp.some(function(x){return x.cd===d.cd_cvm;})) identComp.push({cd:d.cd_cvm, nome:d.nome}); }
+      ident.innerHTML = '<span class="ident-ok">✓ '+d.nome+'</span><span class="ident-meta">identificada via '+d.metodo+'</span>';
+      document.getElementById(confId).style.display='none';
+    } else {
+      ident.innerHTML = '<span class="ident-warn">⚠ '+d.motivo+'</span>';
+      document.getElementById(confId).style.display='block';
+    }
+  }catch(e){
+    ident.innerHTML = '<span class="ident-warn">Não consegui identificar automaticamente. Informe o código CVM.</span>';
+    document.getElementById(confId).style.display='block';
+  }
+  checar();
+}
+
+function checar(){
+  // O botão ativa quando há ARQUIVOS dos dois lados (identificação acontece no servidor).
+  var temFoco = document.getElementById('f-foco').files.length>0;
+  var temComp = document.getElementById('f-comp').files.length>0;
+  document.getElementById('cta').disabled = !(temFoco && temComp);
+}
+
+async function analisar(){
+  var res = document.getElementById('resultado');
+  res.className='resultado show';
+  res.innerHTML='<div class="loading">Identificando empresas e calculando pela régua única…</div>';
+
+  var fd = new FormData();
+  // códigos de confirmação (só usados se a identificação automática falhar)
+  var cf = document.getElementById('cd-foco'); if(cf) fd.append('cd_foco', cf.value.trim());
+  var cc = document.getElementById('cd-comp'); if(cc) fd.append('cd_comp', cc.value.trim());
+  fd.append('ano','2025'); fd.append('ano_ant','2024');
+  var ff=document.getElementById('f-foco').files; for(var i=0;i<ff.length;i++) fd.append('arquivos_foco', ff[i]);
+  var fc=document.getElementById('f-comp').files; for(var j=0;j<fc.length;j++) fd.append('arquivos_comp', fc[j]);
+
+  try{
+    var r = await fetch('/api/analisar',{method:'POST',body:fd});
+    var data = await r.json();
+    if(data.erro){ res.innerHTML='<div class="alerta">'+data.erro+'</div>'; return; }
+    render(data);
+  }catch(e){ res.innerHTML='<div class="alerta">Erro de comunicação: '+e+'</div>'; }
+}
+
+function pct(v){ return v==null?'—':(v*100).toFixed(1).replace('.',',')+'%'; }
+function num(v){ return v==null?'—':v.toFixed(2).replace('.',','); }
+function nomeCurto(e){ return e.nome ? e.nome.split(' ').slice(0,2).join(' ') : e.codigo_cvm; }
+
+function render(data){
+  var empresas = [data.foco].concat(data.comparaveis);
+  var linhas = [
+    ['Liquidez Corrente','liquidez_corrente',num],
+    ['Liquidez Geral','liquidez_geral',num],
+    ['Margem Líquida','margem_liquida',pct],
+    ['Margem EBITDA','margem_ebitda',pct],
+    ['ROE','roe',pct],
+    ['ROI','roi',pct],
+    ['CT / Próprios','ct_proprios',num],
+    ['Giro do Ativo','giro_ativo',num],
+  ];
+  var h = '<h3>Comparativo de Índices</h3><table><thead><tr><th>Indicador</th>';
+  empresas.forEach(function(e,i){ h += '<th'+(i===0?' style="background:#0a2e52"':'')+'>'+(i===0?'★ ':'')+(e.nome?e.nome.split(' ').slice(0,2).join(' '):e.codigo_cvm)+'</th>'; });
+  h += '</tr></thead><tbody>';
+  linhas.forEach(function(l){
+    h += '<tr><td>'+l[0]+'</td>';
+    empresas.forEach(function(e,i){ h += '<td'+(i===0?' class="foco"':'')+'>'+l[2](e.indices[l[1]])+'</td>'; });
+    h += '</tr>';
+  });
+  h += '</tbody></table>';
+  if(data.alertas && data.alertas.length){ data.alertas.forEach(function(a){ h+='<div class="alerta">⚠ '+a+'</div>'; }); }
+  else { h += '<div class="alerta" style="background:#eef7f0;border-color:var(--good);color:#1a4a2a">✓ Todos os balanços fecham (Ativo = Passivo + PL).</div>'; }
+  document.getElementById('resultado').innerHTML = h;
+}
+</script>
+</body></html>
