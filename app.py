@@ -28,10 +28,14 @@ import motor
 BASE = Path(__file__).parent
 app = FastAPI(title="Compara·Fin")
 app.add_middleware(SessionMiddleware, secret_key=os.environ.get("SECRET_KEY", secrets.token_hex(32)))
-app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 
+# Garante que as pastas existam (o GitHub pode não subir pastas vazias/ocultas)
+STATIC_DIR = BASE / "static"
 UPLOAD_DIR = BASE / "uploads"
+STATIC_DIR.mkdir(exist_ok=True)
 UPLOAD_DIR.mkdir(exist_ok=True)
+
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # AUTENTICAÇÃO (simples, para protótipo — trocar por banco de dados em produção)
