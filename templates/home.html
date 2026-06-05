@@ -179,15 +179,24 @@ function checar(){
 async function analisar(){
   var res = document.getElementById('resultado');
   res.className='resultado show';
-  res.innerHTML='<div class="loading">Identificando empresas e calculando pela régua única…</div>';
+  res.innerHTML='<div class="loading">Calculando pela régua única…</div>';
+
+  // código da empresa em foco: o identificado, ou o digitado manualmente
+  var cdFoco = identFoco ? identFoco.cd : '';
+  var cf = document.getElementById('cd-foco'); if(!cdFoco && cf) cdFoco = cf.value.trim();
+
+  // códigos das comparáveis: os identificados, mais os digitados
+  var cods = identComp.map(function(x){return x.cd;});
+  var cc = document.getElementById('cd-comp');
+  if(cc && cc.value.trim()){ cc.value.split(',').forEach(function(c){ c=c.trim(); if(c && cods.indexOf(c)<0) cods.push(c); }); }
+
+  if(!cdFoco){ res.innerHTML='<div class="alerta">Confirme o código CVM da empresa em foco.</div>'; return; }
+  if(cods.length===0){ res.innerHTML='<div class="alerta">Confirme o código CVM de ao menos uma empresa comparável.</div>'; return; }
 
   var fd = new FormData();
-  // códigos de confirmação (só usados se a identificação automática falhar)
-  var cf = document.getElementById('cd-foco'); if(cf) fd.append('cd_foco', cf.value.trim());
-  var cc = document.getElementById('cd-comp'); if(cc) fd.append('cd_comp', cc.value.trim());
+  fd.append('cd_foco', cdFoco);
+  fd.append('cd_comp', cods.join(','));
   fd.append('ano','2025'); fd.append('ano_ant','2024');
-  var ff=document.getElementById('f-foco').files; for(var i=0;i<ff.length;i++) fd.append('arquivos_foco', ff[i]);
-  var fc=document.getElementById('f-comp').files; for(var j=0;j<fc.length;j++) fd.append('arquivos_comp', fc[j]);
 
   try{
     var r = await fetch('/api/analisar',{method:'POST',body:fd});
