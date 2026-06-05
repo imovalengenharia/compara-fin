@@ -11,7 +11,7 @@ Descobre o código CVM de uma empresa lendo o demonstrativo enviado, em camadas
 Importante: o PDF serve só para IDENTIFICAR a empresa. Os NÚMEROS vêm da base CVM
 (estruturados e validados). Assim, erro de leitura/OCR nunca compromete a análise.
 """
-import csv, json, re, os, subprocess, tempfile
+import csv, json, re, os
 from pathlib import Path
 
 BASE = Path(__file__).parent
@@ -45,28 +45,26 @@ def _constroi_indice():
 
 # ─────────────────────────────────────────────────────────────────────────────
 def _texto_pdf(caminho):
-    """Extrai texto do PDF. Se vier vazio (escaneado), faz OCR da 1ª página."""
+    """Extrai o texto das primeiras páginas do PDF usando pdfplumber (biblioteca
+    Python pura — não depende de programas de sistema como pdftotext/tesseract,
+    que podem não existir no servidor de hospedagem). Rápido e à prova de travar."""
     try:
-        txt = subprocess.run(
-            ["pdftotext", "-f", "1", "-l", "5", str(caminho), "-"],
-            capture_output=True, text=True, timeout=60
-        ).stdout
-    except Exception:
-        txt = ""
-    if len(txt.strip()) > 100:
-        return txt, "texto"
-    # fallback OCR — rasteriza a 1ª página e roda tesseract
-    try:
-        with tempfile.TemporaryDirectory() as tmp:
-            subprocess.run(["pdftoppm", "-png", "-f", "1", "-l", "1", "-r", "150",
-                            str(caminho), f"{tmp}/pg"], timeout=90, capture_output=True)
-            pngs = list(Path(tmp).glob("*.png"))
-            if pngs:
-                ocr = subprocess.run(["tesseract", str(pngs[0]), "-", "-l", "por"],
-                                     capture_output=True, text=True, timeout=90).stdout
-                return ocr, "ocr"
+        import pdfplumber
+        texto = []
+        with pdfplumber.open(caminho) as pdf:
+            # só as 3 primeiras páginas bastam para achar nome/CNPJ; evita PDFs enormes
+            for pagina in pdf.pages[:3]:
+                t = pagina.extract_text() or ""
+                texto.append(t)
+                if sum(len(x) for x in texto) > 4000:
+                    break
+        txt = "\n".join(texto)
+        if len(txt.strip()) > 60:
+            return txt, "texto"
     except Exception:
         pass
+    # PDF sem texto (escaneado) ou ilegível → não tenta OCR no servidor (pesado e
+    # pode não estar disponível). Retorna vazio para a interface pedir confirmação.
     return "", "vazio"
 
 def _normaliza(s):

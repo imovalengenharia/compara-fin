@@ -144,11 +144,14 @@ async function anexou(lado){
   var ident = document.getElementById(identId);
   ident.innerHTML = '<span class="ident-loading">Identificando empresa…</span>';
 
-  // envia os arquivos para identificação
+  // envia os arquivos para identificação (com tempo limite para não travar)
   var fd = new FormData();
   for(var i=0;i<input.files.length;i++) fd.append('arquivos', input.files[i]);
   try{
-    var r = await fetch('/api/identificar',{method:'POST',body:fd});
+    var ctrl = new AbortController();
+    var tmo = setTimeout(function(){ ctrl.abort(); }, 25000); // 25s máximo
+    var r = await fetch('/api/identificar',{method:'POST',body:fd,signal:ctrl.signal});
+    clearTimeout(tmo);
     var d = await r.json();
     if(d.ok){
       if(lado==='foco'){ identFoco = {cd:d.cd_cvm, nome:d.nome}; }
@@ -160,7 +163,7 @@ async function anexou(lado){
       document.getElementById(confId).style.display='block';
     }
   }catch(e){
-    ident.innerHTML = '<span class="ident-warn">Não consegui identificar automaticamente. Informe o código CVM.</span>';
+    ident.innerHTML = '<span class="ident-warn">Não identifiquei automaticamente — informe o código CVM abaixo.</span>';
     document.getElementById(confId).style.display='block';
   }
   checar();
