@@ -39,12 +39,33 @@
   function pmtFator(i, n) { return i > 0 ? i / (1 - Math.pow(1 + i, -n)) : (n > 0 ? 1 / n : 0); }
 
   /* ---------------------------------------------------------------- áreas */
+  /* Na planilha, viário, doações, verdes/APP e lazer são digitados em % da gleba;
+     faixa não edificante e área com restrição são digitadas em m². */
+  var PERDAS = [
+    { chave: 'viario',    rotulo: '2 · Sistema viário',              modo: 'pct',
+      nota: 'Ruas e calçadas do loteamento — percentual típico entre 18% e 22% da gleba.' },
+    { chave: 'doacoes',   rotulo: '3 · Doações ao município',        modo: 'pct',
+      nota: 'Doação ao município para equipamentos públicos e lazer — mínimo usual de 5%.' },
+    { chave: 'verdes',    rotulo: '4 · Áreas verdes e APP',          modo: 'pct',
+      nota: 'Áreas verdes e de preservação permanente exigidas pelo licenciamento.' },
+    { chave: 'lazer',     rotulo: '5 · Lazer e áreas comuns',        modo: 'pct',
+      nota: 'Lazer, portaria, apoio técnico, áreas patrimoniais, paisagismo e acesso.' },
+    { chave: 'faixa',     rotulo: '6 · Faixa não edificante',        modo: 'm2',
+      nota: 'Faixas de servidão e domínio: rodovias, linhas de transmissão, dutos.' },
+    { chave: 'restricao', rotulo: '7 · Área com possível restrição', modo: 'm2',
+      nota: 'Reserva para eventuais restrições identificadas no licenciamento.' }
+  ];
   function quadroAreas(P) {
     var a = P.areas, G = num(a.gleba);
-    var perdas = ['viario', 'doacoes', 'verdes', 'lazer', 'faixa', 'restricao']
-      .map(function (k) { return { chave: k, m2: num(a[k]) }; });
+    var perdas = PERDAS.map(function (d) {
+      var m2 = d.modo === 'pct' ? num(a[d.chave]) * G : num(a[d.chave]);
+      return { chave: d.chave, rotulo: d.rotulo, modo: d.modo, nota: d.nota,
+               entrada: num(a[d.chave]), m2: m2, pct: G > 0 ? m2 / G : 0 };
+    });
     var totalPerdas = perdas.reduce(function (s, x) { return s + x.m2; }, 0);
-    return { gleba: G, perdas: perdas, totalPerdas: totalPerdas, alvDisponivel: G - totalPerdas };
+    return { gleba: G, perdas: perdas, totalPerdas: totalPerdas,
+             pctPerdas: G > 0 ? totalPerdas / G : 0, alvDisponivel: G - totalPerdas,
+             pctALV: G > 0 ? (G - totalPerdas) / G : 0 };
   }
 
   /* ------------------------------------------------- produto e faseamento */
@@ -117,9 +138,31 @@
         if (!achouGatilho && pct > num(cfg.gatilho, 0.7)) { gat = j; achouGatilho = true; }
       }
       if (!achouGatilho) gat = duracaoFase;
-      fases.push({ i: f + 1, lanc: lanc, janLanc: janLanc, obraIni: obraIni, prazoObra: prazoObra,
-                   obraFim: obraFim, durPos: durPos, fimVendas: fimVendas, velLanc: velLanc,
-                   velObra: velObra, velPos: velPos, lotes: totalFase, pctAcum: acum });
+      var dEt = Math.trunc(prazoObra / 4), durs = [dEt, dEt, dEt, prazoObra - 3 * dEt];
+      var pcts = [num(cfg.etapa1), num(cfg.etapa2), num(cfg.etapa3)];
+      pcts.push(1 - pcts[0] - pcts[1] - pcts[2]);
+      var cursor = obraIni, etapas = [];
+      for (var e = 0; e < 4; e++) {
+        etapas.push({ n: e + 1, ini: cursor, fim: cursor + Math.max(1, durs[e]) - 1,
+                      dur: Math.max(1, durs[e]), pct: pcts[e], residual: e === 3 });
+        cursor += Math.max(1, durs[e]);
+      }
+      var janelas = [
+        { nome: 'Lançamento',    pct: velLanc, dur: janLanc,   vso: janLanc ? velLanc / janLanc : 0 },
+        { nome: 'Durante a obra', pct: velObra, dur: prazoObra, vso: prazoObra ? velObra / prazoObra : 0,
+          residual: true },
+        { nome: 'Pós-obra',      pct: velPos,  dur: durPos,    vso: durPos ? velPos / durPos : 0 }
+      ];
+      var lotesMes = lotesFase.map(function (q) {
+        return janelas.map(function (j) { return j.dur ? q * j.pct / j.dur : 0; });
+      });
+      fases.push({ i: f + 1, lanc: lanc, lancFim: lanc + janLanc - 1, janLanc: janLanc,
+                   obraIni: obraIni, prazoObra: prazoObra, obraFim: obraFim,
+                   obraUltimoMes: obraIni + prazoObra - 1, durPos: durPos, fimVendas: fimVendas,
+                   velLanc: velLanc, velObra: velObra, velPos: velPos, lotes: totalFase,
+                   lotesProduto: lotesFase.slice(), etapas: etapas, janelas: janelas,
+                   lotesMes: lotesMes, gatilho: num(cfg.gatilho, 0.7), mesGatilho: lanc + gat - 1,
+                   pctAcum: acum });
       vendas.push(vend);
       lancAnterior = lanc; gatilhoAnterior = gat;
     }
@@ -217,8 +260,10 @@
     var pesoFase = cron.fases.map(function (fa) {
       return prog.fases[fa.i - 1].totalLotes / Math.max(1, prog.lotesRes);
     });
+    var obraFase = [0, 0, 0, 0];
     cron.fases.forEach(function (fa, i) {
       var peso = prog.fases[i].totalLotes / Math.max(1, prog.lotesRes);
+      obraFase[i] = obraExec * peso;
       var etapas = [num(P.fases[i].etapa1), num(P.fases[i].etapa2), num(P.fases[i].etapa3)];
       etapas.push(1 - etapas[0] - etapas[1] - etapas[2]);
       var dur = Math.trunc(fa.prazoObra / 4), durs = [dur, dur, dur, fa.prazoObra - 3 * dur];
@@ -274,7 +319,7 @@
                  col.preop[t] + col.contrap[t] + col.obra[t] + col.manut[t] + col.ger[t];
       a += fluxo[t]; acum[t] = a;
     }
-    return { col: col, liquida: liquida, fluxo: fluxo, acum: acum,
+    return { col: col, liquida: liquida, fluxo: fluxo, acum: acum, obraFase: obraFase,
              valores: { obraTotal: obraTotal, preOpV: preOpV, obraExec: obraExec, itbiV: itbiV,
                         contrapV: contrapV, manutV: manutV, mktV: mktV, standV: standV,
                         admV: admV, bancV: bancV, cgaV: cgaV, aquisicao: aquisicao } };
@@ -426,9 +471,51 @@
       { ok: areas.gleba > 0 && areas.totalPerdas < areas.gleba, txt: 'O quadro de áreas fecha' }
     ];
 
+    /* Mês em que cada lote comercial é vendido (à vista), como PREMISSAS linha 26 */
+    var comerciais = prog.com.map(function (c) {
+      var ativo = c.fase <= cron.fases.length && c.lotes > 0;
+      var fa = ativo ? cron.fases[c.fase - 1] : null;
+      return { lotes: c.lotes, area: c.area, fase: c.fase, momento: c.momento, precoM2: c.precoM2,
+               precoLote: c.precoLote, vgv: c.vgv, alv: c.alv, ativo: ativo,
+               mes: !ativo ? null : c.momento === 'Início' ? fa.lanc
+                    : c.momento === 'Fim' ? fa.fimVendas : fa.obraFim };
+    });
+
+    /* Condições de cada plano sobre cada produto residencial (VENDAS linhas 29 a 31) */
+    var ipcaN = num(P.indices.ipca);
+    var planosProduto = prog.res.map(function (r) {
+      return P.planos.map(function (pl) {
+        var n = Math.round(num(pl.n)), liquido = r.precoLote * (1 - num(pl.desconto));
+        var entrada = liquido * num(pl.entrada), fin = liquido - entrada;
+        var jn = Math.pow((1 + num(pl.jurosReal)) * (1 + ipcaN), 1 / 12) - 1;
+        return { n: n, mix: num(pl.mix), entrada: entrada, financiado: fin,
+                 pmt: (fin > 0 && n > 1) ? fin * (jn / (1 - Math.pow(1 + jn, -n))) : 0,
+                 jurosNominal: (1 + num(pl.jurosReal)) * (1 + ipcaN) - 1,
+                 correcaoMes: Math.pow(1 + num(pl.correcao), 1 / 12) - 1 };
+      });
+    });
+
+    /* Resultado por fase, com o mesmo rateio do DRF (linhas 47 a 59) */
+    var recTotais = cron.fases.map(function (f, i) { return soma(R.recFase[i]); });
+    var recGeral = recTotais.reduce(function (a, b) { return a + b; }, 0) || 1;
+    var proporcionais = totais.impostos + totais.corretagem + totais.gestao + totais.premiacao +
+                        totais.marketing + totais.stand + totais.admvendas + totais.bancarias + totais.permuta;
+    var rateadas = totais.terreno + totais.itbi + totais.preop + totais.contrap + totais.manut + totais.cga;
+    var resultadoFase = cron.fases.map(function (f, i) {
+      var part = recTotais[i] / recGeral;
+      var obra = -M.obraFase[i] * (totais.obra / (-(M.obraFase.reduce(function (a, b) { return a + b; }, 0)) || 1));
+      var ger = num(P.custos.gerenciamento) * obra;
+      return { fase: f.i, lotes: f.lotes, lancamento: f.lanc, inicioObra: f.obraIni,
+               entrega: f.obraFim, fimVendas: f.fimVendas, receita: recTotais[i], participacao: part,
+               obras: obra, gerenciamento: ger, proporcionais: part * proporcionais,
+               rateadas: part * rateadas,
+               resultado: recTotais[i] + obra + ger + part * proporcionais + part * rateadas };
+    });
+
     return {
       colunas: COLUNAS, meses: meses, totais: totais, areas: areas, prog: prog,
-      fases: cron.fases, valores: M.valores, checks: checks,
+      fases: cron.fases, valores: M.valores, checks: checks, comerciais: comerciais,
+      planosProduto: planosProduto, resultadoFase: resultadoFase, permutaSerie: M.col.permuta,
       ind: {
         vgv: prog.vgv, vgvRes: prog.vgvRes, vgvCom: prog.vgvCom, alvUsada: prog.alv,
         alvFolga: alvFolga, aproveitamento: areas.gleba > 0 ? prog.alv / areas.gleba : 0,

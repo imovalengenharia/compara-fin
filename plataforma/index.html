@@ -1,45 +1,172 @@
-<!doctype html>
-<html lang="pt-BR">
-<head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Involutivo de glebas</title>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="estilo.css">
-</head>
-<body>
-<header class="topo">
-  <span class="marca">
-    <svg width="24" height="24" viewBox="0 0 26 26" aria-hidden="true"><path d="M2.5 20.5 L9.5 8 L14.5 16.5 L17.8 11 L23.5 20.5 Z" stroke="#0A5E4C" stroke-width="1.6" stroke-linejoin="round" fill="none"></path><circle cx="20" cy="5.6" r="2.3" stroke="#B8862B" stroke-width="1.4" fill="none"></circle></svg>
-    <strong>Involutivo</strong><span class="selo">GLEBAS URBANIZÁVEIS</span>
-  </span>
-  <span id="titulo-estudo" style="font-size:13px;color:#5F6A64"></span>
-  <span class="cresce"></span>
-  <span id="status" style="font-size:12px;color:#5F6A64"></span>
-  <button class="btn" id="btn-restaurar" type="button">Restaurar padrão</button>
-  <button class="btn" id="btn-json" type="button">Salvar premissas</button>
-  <label class="btn" for="arquivo-json" style="display:inline-block">Abrir premissas
-    <input type="file" id="arquivo-json" accept="application/json" hidden></label>
-  <button class="btn forte" id="btn-csv" type="button">Exportar fluxo (CSV)</button>
-</header>
+<title>Involutivo de Glebas</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;450;500;600&display=swap">
+<style>
+:root{
+  --ink:#14202E; --ink2:#3C4B5C; --muted:#6A7A8B;
+  --navy:#1F4E78; --navy2:#17395A; --navy-soft:#E8EFF6;
+  --ground:#EDF1F5; --surface:#FFFFFF; --rule:#D8E0E8; --rule-soft:#EBEFF4;
+  --campo:#E7F0FA; --campo-borda:#A9C8E6; --campo-foco:#1F4E78;
+  --pos:#1B6E52; --neg:#B4512A; --warn:#8A6410;
+  --sombra:0 1px 2px rgba(20,32,46,.05);
+  --sans:'IBM Plex Sans',system-ui,sans-serif;
+  --cond:'IBM Plex Sans Condensed','IBM Plex Sans',system-ui,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --ink:#E7EDF4; --ink2:#B7C4D2; --muted:#8497A8;
+  --navy:#7FB2DE; --navy2:#A8CCEA; --navy-soft:#1A2938;
+  --ground:#0E1620; --surface:#16212E; --rule:#27333F; --rule-soft:#1E2A37;
+  --campo:#1A2C3E; --campo-borda:#33506E; --campo-foco:#7FB2DE;
+  --pos:#57B08C; --neg:#E08A5F; --warn:#C9A44B;
+  --sombra:0 1px 2px rgba(0,0,0,.3);
+}}
+:root[data-theme="dark"]{
+  --ink:#E7EDF4; --ink2:#B7C4D2; --muted:#8497A8;
+  --navy:#7FB2DE; --navy2:#A8CCEA; --navy-soft:#1A2938;
+  --ground:#0E1620; --surface:#16212E; --rule:#27333F; --rule-soft:#1E2A37;
+  --campo:#1A2C3E; --campo-borda:#33506E; --campo-foco:#7FB2DE;
+  --pos:#57B08C; --neg:#E08A5F; --warn:#C9A44B;
+  --sombra:0 1px 2px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:13.5px;line-height:1.45}
+h1,h2,h3{margin:0;font-weight:600}
+button{font:inherit;color:inherit}
 
-<div class="corpo">
-  <form class="painel" id="painel" autocomplete="off"></form>
-  <main class="saida">
-    <div class="abas" role="tablist">
-      <button class="aba" role="tab" data-aba="resumo" aria-selected="true">Resumo</button>
-      <button class="aba" role="tab" data-aba="fluxo" aria-selected="false">Fluxo de caixa mensal</button>
-      <button class="aba" role="tab" data-aba="drf" aria-selected="false">Demonstrativo</button>
-      <button class="aba" role="tab" data-aba="vendas" aria-selected="false">Vendas e cronograma</button>
-    </div>
-    <section id="painel-resumo" role="tabpanel"></section>
-    <section id="painel-fluxo" role="tabpanel" hidden></section>
-    <section id="painel-drf" role="tabpanel" hidden></section>
-    <section id="painel-vendas" role="tabpanel" hidden></section>
-  </main>
-</div>
+/* ---------- barra superior ---------- */
+.barra{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:var(--navy);color:#fff;
+  display:flex;align-items:center;gap:14px;padding:10px 20px;flex-wrap:wrap}
+.barra .nome{font-family:var(--cond);font-size:19px;letter-spacing:.005em}
+.barra .sub{font-size:12px;color:#BCD5EA}
+.barra .vazio{flex:1}
+.resumo-topo{display:flex;gap:20px;align-items:baseline}
+.resumo-topo div{display:flex;flex-direction:column}
+.resumo-topo .r{font-size:9.5px;letter-spacing:.11em;color:#9FC2DE;text-transform:uppercase}
+.resumo-topo .v{font-family:var(--mono);font-size:15px;font-weight:500}
+.acao{background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.28);border-radius:6px;
+  padding:6px 11px;font-size:12px;cursor:pointer;color:#fff}
+.acao:hover{background:rgba(255,255,255,.2)}
+.acao.destaque{background:#fff;color:var(--navy);border-color:#fff;font-weight:500}
+
+/* ---------- abas = planilhas ---------- */
+.abas{position:sticky;top:calc(env(safe-area-inset-top,0px) + 45px);z-index:29;background:var(--surface);
+  border-bottom:1px solid var(--rule);display:flex;gap:0;overflow-x:auto;padding:0 12px}
+.aba{border:none;background:none;padding:10px 15px;font-size:13px;color:var(--muted);cursor:pointer;
+  white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px}
+.aba:hover{color:var(--ink)}
+.aba[aria-selected="true"]{color:var(--navy);border-bottom-color:var(--navy);font-weight:600}
+.aba .n{font-family:var(--mono);font-size:10.5px;color:var(--muted);margin-right:6px}
+.aba[aria-selected="true"] .n{color:var(--navy)}
+
+/* ---------- folha ---------- */
+.folha{padding:18px 20px 60px;max-width:1520px;margin:0 auto}
+.folha-topo{display:flex;align-items:baseline;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.folha-topo h1{font-family:var(--cond);font-size:22px}
+.folha-topo p{margin:0;font-size:12.5px;color:var(--muted);max-width:74ch}
+.selo{font-size:10px;letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;border-radius:3px;
+  background:var(--navy-soft);color:var(--navy)}
+.selo.off{background:var(--rule-soft);color:var(--muted)}
+
+.quadro{background:var(--surface);border:1px solid var(--rule);border-radius:4px;margin-bottom:14px;
+  box-shadow:var(--sombra);overflow:hidden}
+.quadro>header{background:var(--navy);color:#fff;padding:7px 14px;display:flex;align-items:baseline;gap:10px}
+.quadro>header h2{font-family:var(--cond);font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+.quadro>header .obs{font-size:11.5px;color:#BCD5EA;font-weight:400}
+.quadro .interior{padding:2px 14px 10px}
+
+.reg{display:grid;grid-template-columns:minmax(200px,1.5fr) auto auto minmax(0,2fr);gap:0 14px;
+  align-items:center;padding:5px 0;border-bottom:1px solid var(--rule-soft)}
+.reg:last-child{border-bottom:none}
+.reg>.rot{font-size:12.5px;color:var(--ink2)}
+.reg>.nota{font-size:11.5px;color:var(--muted);line-height:1.35}
+.reg.forte{background:var(--rule-soft);margin:0 -14px;padding-left:14px;padding-right:14px}
+.reg.forte>.rot{font-weight:600;color:var(--ink)}
+@media (max-width:900px){.reg{grid-template-columns:1fr auto;gap:0 10px}.reg>.nota{grid-column:1/-1;padding-bottom:4px}}
+
+input,select{font:inherit;font-family:var(--mono);font-size:12.5px;background:var(--campo);
+  border:1px solid var(--campo-borda);border-radius:3px;padding:4px 7px;text-align:right;color:var(--ink);width:104px}
+select{font-family:var(--sans);text-align:left;width:130px}
+input[type=text]{font-family:var(--sans);text-align:left;width:190px}
+input:focus,select:focus{outline:2px solid var(--campo-foco);outline-offset:-1px;background:var(--surface)}
+input:disabled{background:var(--rule-soft);border-color:var(--rule);color:var(--muted)}
+.un{font-size:11px;color:var(--muted);min-width:26px}
+.calc{font-family:var(--mono);font-size:12.5px;text-align:right;min-width:104px;color:var(--ink);
+  font-variant-numeric:tabular-nums}
+.calc.fraco{color:var(--muted)}
+
+table.grade{width:100%;border-collapse:collapse;font-size:12.5px}
+table.grade th{font-weight:500;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  padding:6px 5px;text-align:center;border-bottom:1px solid var(--rule)}
+table.grade th:first-child{text-align:left;width:34%}
+table.grade td{padding:3px 5px;border-bottom:1px solid var(--rule-soft);text-align:center}
+table.grade td:first-child{text-align:left;color:var(--ink2)}
+table.grade td.calc{text-align:right;padding-right:10px}
+table.grade tr.forte td{background:var(--rule-soft);font-weight:600;color:var(--ink)}
+table.grade input,table.grade select{width:100%;max-width:120px}
+.nota-bloco{font-size:11.5px;color:var(--muted);padding:8px 0 2px;line-height:1.45;max-width:96ch}
+
+/* ---------- tabelas de saída ---------- */
+.rolagem{overflow:auto;max-height:70vh;border:1px solid var(--rule);border-radius:4px;background:var(--surface)}
+table.dados{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
+table.dados th{position:sticky;top:0;background:var(--surface);color:var(--muted);font-weight:500;
+  text-align:right;padding:7px 9px;border-bottom:1px solid var(--rule);white-space:nowrap;z-index:2;
+  font-size:10.5px;letter-spacing:.05em;text-transform:uppercase}
+table.dados th:first-child,table.dados td:first-child{text-align:left;position:sticky;left:0;
+  background:var(--surface);z-index:1}
+table.dados th:first-child{z-index:3}
+table.dados td{text-align:right;padding:3px 9px;border-bottom:1px solid var(--rule-soft);
+  font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+table.dados td:first-child{font-family:var(--sans);color:var(--ink2)}
+table.dados tr.total td{background:var(--navy-soft);font-weight:500;border-bottom:1px solid var(--rule)}
+table.dados tr.total td:first-child{background:var(--navy-soft);font-weight:600}
+table.dados tr:hover td{background:var(--rule-soft)}
+table.dados tr.total:hover td{background:var(--navy-soft)}
+.neg{color:var(--neg)}
+tr.soma td{background:var(--rule-soft);font-weight:600;border-top:1px solid var(--rule)}
+tr.soma td:first-child{background:var(--rule-soft);color:var(--ink)}
+td.ind{padding-left:24px}
+
+/* ---------- indicadores ---------- */
+.painel{display:flex;flex-wrap:wrap;gap:1px;background:var(--rule);border:1px solid var(--rule);
+  border-radius:4px;overflow:hidden}
+.painel .cel{background:var(--surface);padding:11px 13px;flex:1 1 180px;min-width:168px}
+.painel .k{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.painel .v{font-family:var(--mono);font-size:19px;font-weight:500;margin-top:3px;font-variant-numeric:tabular-nums}
+.painel .n{font-size:11.5px;color:var(--muted);margin-top:1px}
+.destaque-gleba{background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--navy);
+  border-radius:4px;padding:16px 18px;margin-bottom:14px;display:flex;gap:26px;align-items:flex-end;flex-wrap:wrap}
+.destaque-gleba .k{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.destaque-gleba .v{font-family:var(--mono);font-size:38px;font-weight:500;line-height:1.05;letter-spacing:-.01em}
+.destaque-gleba .n{font-size:12px;color:var(--muted);margin-top:3px;max-width:52ch}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;color:var(--ink2);
+  border:1px solid var(--rule);border-radius:3px;padding:4px 9px;background:var(--surface)}
+.chip .pt{width:6px;height:6px;border-radius:50%;background:var(--pos)}
+.chip.ruim{border-color:var(--neg);color:var(--neg)}
+.chip.ruim .pt{background:var(--neg)}
+.alerta{border-left:3px solid var(--warn);background:var(--surface);border:1px solid var(--rule);
+  border-left:3px solid var(--warn);border-radius:4px;padding:10px 14px;font-size:12.5px;margin-bottom:14px}
+.memo h3{font-family:var(--cond);font-size:14px;letter-spacing:.05em;text-transform:uppercase;color:var(--navy);
+  margin:18px 0 6px}
+.memo p{margin:0 0 9px;max-width:88ch;font-size:13px;color:var(--ink2);line-height:1.6}
+.memo .num{font-family:var(--mono);color:var(--ink);font-weight:500}
+</style>
+
+<header class="barra">
+  <span class="nome">Involutivo</span>
+  <span class="sub" id="sub-estudo"></span>
+  <span class="vazio"></span>
+  <div class="resumo-topo" id="resumo-topo"></div>
+  <button class="acao" id="btn-restaurar" type="button">Restaurar padrão</button>
+  <button class="acao" id="btn-json" type="button">Salvar</button>
+  <button class="acao destaque" id="btn-csv" type="button">Exportar fluxo</button>
+</header>
+<nav class="abas" id="abas" role="tablist"></nav>
+<main class="folha" id="folha"></main>
 
 <script src="motor.js"></script>
 <script src="app.js"></script>
-</body>
-</html>
