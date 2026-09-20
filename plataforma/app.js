@@ -261,10 +261,12 @@
   function grade(colunas, linhas, nota) {
     var thead = e('tr', {}, [e('th', { txt: '' })]);
     colunas.forEach(function (c) { thead.appendChild(e('th', { txt: c })); });
+    thead.appendChild(e('th', { txt: '' }));          /* folga: mantém a grade fixa */
     var tb = e('tbody');
     linhas.forEach(function (l) {
       var tr = e('tr', { cls: l.forte ? 'forte' : '' }, [e('td', { txt: l.rot })]);
       l.cels.forEach(function (c) { tr.appendChild(e('td', {}, [c])); });
+      tr.appendChild(e('td', {}));
       tb.appendChild(tr);
     });
     var tabela = e('table', { cls: 'grade' }, [e('thead', {}, [thead]), tb]);
@@ -576,16 +578,14 @@
     var F = function (r) { return r.fases[fi]; };
 
     f.appendChild(quadro('Eventos', 'início e fim são calculados; só a duração é digitada', [
-      reg('Lançamento da fase',
-        [calc(function (r) { return mes(F(r).lanc); }, 'fraco'), un('a'),
-         calc(function (r) { return mes(F(r).lancFim); }, 'fraco'), un('·'),
-         inp('fases.' + fi + '.janLanc', 'num', { step: 1 }), un('meses')],
+      reg('Lançamento da fase — duração',
+        [inp('fases.' + fi + '.janLanc', 'num', { step: 1, min: 1, max: 120 }), un('meses'),
+         calc(function (r) { return 'mês ' + F(r).lanc + ' a ' + F(r).lancFim; })],
         fi === 0 ? 'Começa no mês seguinte ao fim dos pré-operacionais.'
                  : 'O mês de início vem do gatilho da fase anterior — não é digitável.'),
-      reg('Obra da fase',
-        [calc(function (r) { return mes(F(r).obraIni); }, 'fraco'), un('a'),
-         calc(function (r) { return mes(F(r).obraUltimoMes); }, 'fraco'), un('·'),
-         inp('fases.' + fi + '.prazoObra', 'num', { step: 1 }), un('meses')],
+      reg('Obra da fase — prazo',
+        [inp('fases.' + fi + '.prazoObra', 'num', { step: 1, min: 1, max: 240 }), un('meses'),
+         calc(function (r) { return 'mês ' + F(r).obraIni + ' a ' + F(r).obraUltimoMes; })],
         'A obra começa no mês seguinte ao fim da janela de lançamento.'),
       reg('Entrega da obra', [calc(function (r) { return mes(F(r).obraFim); })],
         'Marco de referência para a manutenção pós-obra e para os lotes comerciais vendidos no "Intermediário".', true),
@@ -620,8 +620,12 @@
     f.appendChild(quadro('Gatilho de vendas', null, [
       reg('% vendido para lançar a fase seguinte', [inp('fases.' + fi + '.gatilho', 'pct'), un('%')],
         'Enquanto a fase atual não atinge este percentual, a seguinte não lança — é o mecanismo que protege o caixa.'),
-      reg('Gatilho atingido em', [calc(function (r) { return mes(F(r).mesGatilho); }),
-        calc(function (r) { return fi + 1 < r.fases.length ? '→ fase ' + (fi + 2) + ' lança no mês ' + n(r.fases[fi + 1].lanc, 0) : 'não há fase seguinte ativa'; }, 'fraco')], null, true)
+      reg('Gatilho atingido em', [calc(function (r) { return mes(F(r).mesGatilho); })],
+        function (r) {
+          return fi + 1 < r.fases.length
+            ? 'A fase ' + (fi + 2) + ' é lançada no mês ' + n(r.fases[fi + 1].lanc, 0) + '.'
+            : 'Não há fase seguinte ativa.';
+        }, true)
     ]));
 
     f.appendChild(quadro('Velocidade por produto', 'lotes por mês em cada janela · comercial vende em mês único', [grade(
