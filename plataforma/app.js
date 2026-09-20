@@ -13,13 +13,14 @@
       areas: { gleba: 160084, viario: 0.24022388246170762, doacoes: 0.025,
                verdes: 0.1288136228480048, lazer: 0.10466942355263506, faixa: 14408, restricao: 0 },
       prazos: { preOp: 18, nFases: 1 },
-      residenciais: [{ area: 391.406, precoM2: 1250 }, { area: 0, precoM2: 0 }, { area: 0, precoM2: 0 },
-                     { area: 0, precoM2: 0 }, { area: 0, precoM2: 0 }],
-      quadro: [[164, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
-      comerciais: [{ lotes: 1, area: 800, fase: 1, momento: 'Intermediário', precoM2: 1250 },
-                   { lotes: 4, area: 85, fase: 1, momento: 'Início', precoM2: 1250 },
-                   { lotes: 4, area: 85, fase: 1, momento: 'Intermediário', precoM2: 1250 },
-                   { lotes: 2, area: 85, fase: 1, momento: 'Fim', precoM2: 1250 }],
+      produtos: [
+        { tipo: 'residencial', area: 391.406, precoM2: 1250, pagamento: 'planos', momento: 'Intermediário' },
+        { tipo: 'comercial', area: 800, precoM2: 1250, pagamento: 'avista', momento: 'Intermediário' },
+        { tipo: 'comercial', area: 85, precoM2: 1250, pagamento: 'avista', momento: 'Início' },
+        { tipo: 'comercial', area: 85, precoM2: 1250, pagamento: 'avista', momento: 'Intermediário' },
+        { tipo: 'comercial', area: 85, precoM2: 1250, pagamento: 'avista', momento: 'Fim' }],
+      quadro: [[164, 0, 0, 0], [1, 0, 0, 0], [4, 0, 0, 0], [4, 0, 0, 0], [2, 0, 0, 0]],
+      travaALV: 'travado',
       planos: [{ n: 1, mix: 0.2, entrada: 1, desconto: 0.05, correcao: 0.05, jurosReal: 0 },
                { n: 120, mix: 0.5, entrada: 0.15, desconto: 0, correcao: 0.05, jurosReal: 0.08 },
                { n: 180, mix: 0.3, entrada: 0.15, desconto: 0, correcao: 0.05, jurosReal: 0.08 },
@@ -76,6 +77,74 @@
     o[ks[ks.length - 1]] = v;
   }
 
+
+  /* ------------------------------------------------------- trava da ALV */
+  function alvDisponivelP() {
+    var a = P.areas, G = +a.gleba || 0;
+    var pct = (+a.viario || 0) + (+a.doacoes || 0) + (+a.verdes || 0) + (+a.lazer || 0);
+    return G - (pct * G + (+a.faixa || 0) + (+a.restricao || 0));
+  }
+  function nFasesP() { return Math.max(1, Math.min(4, Math.round(+P.prazos.nFases || 1))); }
+  function alvUsadaExcluindo(pEx, fEx) {
+    var nF = nFasesP(), t = 0;
+    for (var p = 0; p < P.produtos.length; p++) {
+      for (var fa = 0; fa < nF; fa++) {
+        if (p === pEx && (fEx === null || fa === fEx)) continue;
+        t += (+P.quadro[p][fa] || 0) * (+P.produtos[p].area || 0);
+      }
+    }
+    return t;
+  }
+  var tempoAviso = null;
+  function avisar(titulo, texto) {
+    var velho = document.getElementById('aviso-flutuante');
+    if (velho) velho.remove();
+    var el = e('div', { cls: 'aviso-flutuante', id: 'aviso-flutuante' },
+      [e('b', { txt: titulo }), e('span', { txt: texto })]);
+    document.body.appendChild(el);
+    clearTimeout(tempoAviso);
+    tempoAviso = setTimeout(function () { el.remove(); }, 6000);
+  }
+  function aplicarLimite(el, caminho, valor, msg) {
+    guardar(caminho, valor);
+    el.value = valor;
+    el.classList.add('limitado');
+    setTimeout(function () { el.classList.remove('limitado'); }, 2200);
+    avisar('Limitado pela ALV disponível', msg);
+  }
+  /* Impede lançar lotes ou ampliar o lote além do que a gleba comporta. */
+  function travarALV(el, caminho) {
+    if (P.travaALV === 'livre') return;
+    var disp = alvDisponivelP(), nF = nFasesP();
+    var q = /^quadro\.(\d+)\.(\d+)$/.exec(caminho);
+    if (q) {
+      var p = +q[1], fa = +q[2];
+      if (fa >= nF) return;
+      var area = +P.produtos[p].area || 0;
+      if (area <= 0) return;
+      var livre = disp - alvUsadaExcluindo(p, fa);
+      var max = Math.max(0, Math.floor(livre / area + 1e-9));
+      if ((+P.quadro[p][fa] || 0) > max) {
+        aplicarLimite(el, caminho, max, 'Com ' + n(area, 2) + ' m² por lote, cabem no máximo ' +
+          n(max, 0) + ' lotes do Produto ' + (p + 1) + ' na fase ' + (fa + 1) +
+          '. Aumente a gleba, reduza as perdas ou diminua outro produto.');
+      }
+      return;
+    }
+    var a = /^produtos\.(\d+)\.area$/.exec(caminho);
+    if (a) {
+      var p2 = +a[1], lotes = 0;
+      for (var fb = 0; fb < nF; fb++) lotes += +P.quadro[p2][fb] || 0;
+      if (lotes <= 0) return;
+      var livre2 = disp - alvUsadaExcluindo(p2, null);
+      var maxA = Math.max(0, Math.floor((livre2 / lotes) * 1000) / 1000);
+      if ((+P.produtos[p2].area || 0) > maxA) {
+        aplicarLimite(el, caminho, maxA, 'Com ' + n(lotes, 0) + ' lotes lançados, o Produto ' + (p2 + 1) +
+          ' pode ter no máximo ' + n(maxA, 2) + ' m² por lote dentro da ALV disponível.');
+      }
+    }
+  }
+
   /* --------------------------------------------------- células e registros */
   var timer = null;
   function aoDigitar(ev) {
@@ -89,6 +158,7 @@
       if (t === 'pct') v = v / 100;
     }
     guardar(c, v);
+    travarALV(el, c);
     var remonta = el.dataset.remonta === '1';
     clearTimeout(timer);
     timer = setTimeout(function () { recalcular(); if (remonta) montarFolha(true); }, 80);
@@ -126,22 +196,39 @@
   }
   function un(t) { return e('span', { cls: 'un', txt: t || '' }); }
 
+  /* rótulo | valor | unidade | complemento | nota — colunas fixas em toda a plataforma */
   function reg(rot, celulas, nota, forte) {
     var linha = e('div', { cls: 'reg' + (forte ? ' forte' : '') }, [e('div', { cls: 'rot', txt: rot })]);
-    var caixa = e('div', { style: 'display:flex;gap:8px;align-items:center;justify-content:flex-end' }, celulas);
-    linha.appendChild(caixa);
-    linha.appendChild(e('div'));
+    celulas = (celulas || []).filter(Boolean);
+    if (celulas.length > 3) {
+      linha.appendChild(e('div', { cls: 'livre' }, celulas));
+    } else {
+      var temUn = celulas[1] && celulas[1].className === 'un';
+      linha.appendChild(e('div', { cls: 'val' }, celulas[0] ? [celulas[0]] : []));
+      linha.appendChild(e('div', { cls: 'uni' }, temUn ? [celulas[1]] : []));
+      var comp = temUn ? celulas[2] : celulas[1];
+      linha.appendChild(e('div', { cls: 'comp' }, comp ? [comp] : []));
+    }
     linha.appendChild(e('div', { cls: 'nota', txt: nota || '' }));
     return linha;
   }
 
   function quadro(titulo, obs, filhos, nota) {
+    var id = 'aberto.' + titulo.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 44);
+    var aberto = true;
+    try { if (localStorage.getItem('involutivo.' + id) === '0') aberto = false; } catch (err) {}
     var interior = e('div', { cls: 'interior' }, filhos);
     if (nota) interior.appendChild(e('p', { cls: 'nota-bloco', txt: nota }));
-    return e('section', { cls: 'quadro' }, [
-      e('header', {}, [e('h2', { txt: titulo }), obs ? e('span', { cls: 'obs', txt: obs }) : null]),
+    var d = e('details', { cls: 'quadro' }, [
+      e('summary', {}, [e('h2', { txt: titulo }), obs ? e('span', { cls: 'obs', txt: obs }) : null,
+                        e('span', { cls: 'seta' })]),
       interior
     ]);
+    if (aberto) d.setAttribute('open', 'open');
+    d.addEventListener('toggle', function () {
+      try { localStorage.setItem('involutivo.' + id, d.open ? '1' : '0'); } catch (err) {}
+    });
+    return d;
   }
 
   function grade(colunas, linhas, nota) {
@@ -150,7 +237,7 @@
     var tb = e('tbody');
     linhas.forEach(function (l) {
       var tr = e('tr', { cls: l.forte ? 'forte' : '' }, [e('td', { txt: l.rot })]);
-      l.cels.forEach(function (c) { tr.appendChild(e('td', { cls: c && c.className === 'calc' ? 'calc' : '' }, [c])); });
+      l.cels.forEach(function (c) { tr.appendChild(e('td', {}, [c])); });
       tb.appendChild(tr);
     });
     var tabela = e('table', { cls: 'grade' }, [e('thead', {}, [thead]), tb]);
@@ -207,20 +294,39 @@
         'Cada fase tem obra, lançamento e curva de vendas próprios. As fases inativas não entram em nada.')
     ]));
 
-    /* 3 — produtos residenciais */
-    var colProd = ['Produto 1', 'Produto 2', 'Produto 3', 'Produto 4', 'Produto 5'];
-    f.appendChild(quadro('Produtos residenciais', 'tipologias de lote', [grade(colProd, [
-      { rot: 'Área do lote (m²)', cels: [0, 1, 2, 3, 4].map(function (i) { return inp('residenciais.' + i + '.area', 'num'); }) },
-      { rot: 'Preço de venda (R$/m²)', cels: [0, 1, 2, 3, 4].map(function (i) { return inp('residenciais.' + i + '.precoM2', 'num'); }) },
-      { rot: 'Preço do lote (R$)', forte: true, cels: [0, 1, 2, 3, 4].map(function (i) {
-          return calc(function (r) { return r.prog.res[i].precoLote ? n(r.prog.res[i].precoLote, 0) : '—'; }); }) }
-    ], 'Preço na data-base, sem correção. A correção até o mês da venda é aplicada por plano, no quadro de planos.')]));
+    /* 3 — produtos: residenciais e comerciais no mesmo quadro */
+    var colProd = [1, 2, 3, 4, 5].map(function (i) { return 'Produto ' + i; });
+    var idxP = [0, 1, 2, 3, 4];
+    f.appendChild(quadro('Produtos', 'o tipo define como vende; o pagamento define como recebe', [grade(colProd, [
+      { rot: 'Tipo', cels: idxP.map(function (i) {
+          return inp('produtos.' + i + '.tipo', 'sel', { opcoes: ['residencial', 'comercial'], remonta: true }); }) },
+      { rot: 'Área do lote (m²)', cels: idxP.map(function (i) { return inp('produtos.' + i + '.area', 'num'); }) },
+      { rot: 'Preço de venda (R$/m²)', cels: idxP.map(function (i) { return inp('produtos.' + i + '.precoM2', 'num'); }) },
+      { rot: 'Preço do lote (R$)', forte: true, cels: idxP.map(function (i) {
+          return calc(function (r) { return r.prog.prods[i].precoLote ? n(r.prog.prods[i].precoLote, 0) : '—'; }); }) },
+      { rot: 'Forma de pagamento', cels: idxP.map(function (i) {
+          return inp('produtos.' + i + '.pagamento', 'sel', { opcoes: ['planos', 'avista'] }); }) },
+      { rot: 'Mês da venda (comercial)', cels: idxP.map(function (i) {
+          return P.produtos[i].tipo === 'comercial'
+            ? inp('produtos.' + i + '.momento', 'sel', { opcoes: ['Início', 'Intermediário', 'Fim'] })
+            : calc(function () { return 'curva de vendas'; }, 'fraco'); }) },
+      { rot: 'Lotes no programa', cels: idxP.map(function (i) {
+          return calc(function (r) { return n(r.produtos[i].lotes, 0); }); }) },
+      { rot: 'VGV do produto (R$)', cels: idxP.map(function (i) {
+          return calc(function (r) { return r.produtos[i].vgv ? n(r.produtos[i].vgv, 0) : '—'; }); }) },
+      { rot: 'Vendido no mês', cels: idxP.map(function (i) {
+          return calc(function (r) {
+            var p = r.produtos[i];
+            if (p.tipo !== 'comercial') return '—';
+            return p.meses.length ? p.meses.map(function (m) { return 'F' + m.fase + ': ' + m.mes; }).join(' · ') : '—';
+          }, 'fraco'); }) }
+    ], 'Residencial vende ao longo das três janelas da fase; comercial é negociado em um único mês — Início é o lançamento da fase, Intermediário a entrega da obra e Fim o último mês de vendas. A forma de pagamento é livre para os dois: "planos" usa o mix de planos de venda; "avista" recebe tudo no ato, sem desconto.')]));
 
     /* 4 — quadro de fases */
     var colFases = ['Fase 1', 'Fase 2', 'Fase 3', 'Fase 4'];
-    var linhasFase = [0, 1, 2, 3, 4].map(function (p) {
-      return { rot: 'Lotes do Produto ' + (p + 1), cels: [0, 1, 2, 3].map(function (fa) {
-        return inp('quadro.' + p + '.' + fa, 'num', { step: 1 }); }) };
+    var linhasFase = idxP.map(function (p) {
+      return { rot: 'Lotes do Produto ' + (p + 1) + ' · ' + (P.produtos[p].tipo === 'comercial' ? 'com.' : 'resid.'),
+               cels: [0, 1, 2, 3].map(function (fa) { return inp('quadro.' + p + '.' + fa, 'num', { step: 1 }); }) };
     });
     linhasFase.push({ rot: 'Fase ativa?', cels: [0, 1, 2, 3].map(function (fa) {
       return calc(function (r) { return fa < r.prog.nFases ? 'Sim' : 'Não'; }, 'fraco'); }) });
@@ -230,34 +336,32 @@
       return calc(function (r) { return n(r.prog.fases[fa].vgv, 0); }); }) });
     linhasFase.push({ rot: 'ALV da fase (m²)', cels: [0, 1, 2, 3].map(function (fa) {
       return calc(function (r) { return n(r.prog.fases[fa].alv, 0); }); }) });
-    f.appendChild(quadro('Quadro de fases', 'lotes de cada produto em cada fase', [grade(colFases, linhasFase,
-      'Só as fases ativas entram no cálculo. A distribuição não precisa ser igual entre fases — normalmente não é.')]));
+    f.appendChild(quadro('Quadro de fases', 'lotes de cada produto em cada fase',
+      [grade(colFases, linhasFase),
+       reg('Saldo de ALV', [calc(function (r) { return n(r.ind.alvFolga, 0) + ' m²'; }),
+         calc(function (r) { return r.ind.alvFolga >= -0.5 ? 'cabe na gleba' : 'NÃO CABE'; }, 'fraco')],
+         P.travaALV === 'travado'
+           ? 'Com a trava ligada, a plataforma limita o lançamento ao que a ALV comporta.'
+           : 'Trava desligada: é possível lançar mais do que a gleba comporta.', true)],
+      'Só as fases ativas entram no cálculo. A distribuição não precisa ser igual entre fases — normalmente não é.'));
 
-    /* 5 — produtos comerciais */
-    var colCom = ['Produto 1', 'Produto 2', 'Produto 3', 'Produto 4'];
-    f.appendChild(quadro('Produtos comerciais', 'vendidos à vista, em um único mês', [grade(colCom, [
-      { rot: 'Lotes', cels: [0, 1, 2, 3].map(function (i) { return inp('comerciais.' + i + '.lotes', 'num', { step: 1 }); }) },
-      { rot: 'Área do lote (m²)', cels: [0, 1, 2, 3].map(function (i) { return inp('comerciais.' + i + '.area', 'num'); }) },
-      { rot: 'Preço de venda (R$/m²)', cels: [0, 1, 2, 3].map(function (i) { return inp('comerciais.' + i + '.precoM2', 'num'); }) },
-      { rot: 'Fase comercializada', cels: [0, 1, 2, 3].map(function (i) { return inp('comerciais.' + i + '.fase', 'num', { step: 1 }); }) },
-      { rot: 'Momento da venda', cels: [0, 1, 2, 3].map(function (i) {
-          return inp('comerciais.' + i + '.momento', 'sel', { opcoes: ['Início', 'Intermediário', 'Fim'] }); }) },
-      { rot: 'Mês da comercialização', forte: true, cels: [0, 1, 2, 3].map(function (i) {
-          return calc(function (r) { return r.comerciais[i].mes === null ? '—' : n(r.comerciais[i].mes, 0); }); }) },
-      { rot: 'VGV do produto (R$)', cels: [0, 1, 2, 3].map(function (i) {
-          return calc(function (r) { return n(r.comerciais[i].vgv, 0); }); }) }
-    ], 'Início = mês do lançamento da fase · Intermediário = entrega da obra da fase · Fim = último mês de vendas da fase.')]));
-
-    /* 6 — resumo do programa (só agora, porque depende de tudo acima) */
+    /* 5 — resumo do programa (depende de tudo acima) */
     f.appendChild(quadro('Resumo do programa', 'resultado das premissas acima', [
       reg('VGV total de tabela', [calc(function (r) { return R$(r.ind.vgv); })],
-        'Residencial mais comercial, a preço de tabela na data-base.', true),
-      reg('ALV utilizada pelo programa', [calc(function (r) { return n(r.ind.alvUsada, 0) + ' m²'; })],
-        'Soma da área dos lotes lançados, residenciais e comerciais.'),
+        'Todos os produtos, a preço de tabela na data-base.', true),
+      reg('ALV disponível', [calc(function (r) { return n(r.areas.alvDisponivel, 0) + ' m²'; })],
+        'Vem do quadro de áreas: é o teto físico do programa.'),
+      reg('ALV utilizada pelo programa', [calc(function (r) { return n(r.ind.alvUsada, 0) + ' m²'; }),
+        calc(function (r) { return pc(r.areas.alvDisponivel ? r.ind.alvUsada / r.areas.alvDisponivel : 0, 1) + ' do disponível'; }, 'fraco')],
+        'Soma da área dos lotes lançados nas fases ativas.'),
       reg('Saldo de ALV', [calc(function (r) { return n(r.ind.alvFolga, 0) + ' m²'; }),
         calc(function (r) { return r.ind.alvFolga >= -0.5 ? 'ALV suficiente' : 'ALV INSUFICIENTE'; }, 'fraco')],
-        'Disponível menos utilizada. Negativo significa que o programa não cabe na gleba.'),
+        'Disponível menos utilizada.', true),
+      reg('Trava da ALV', [inp('travaALV', 'sel', { opcoes: ['travado', 'livre'], remonta: true })],
+        'Travado: a plataforma impede lançar lotes ou ampliar o lote além do que a gleba comporta, e avisa qual é o máximo. Livre: permite ultrapassar, e o saldo negativo fica acusado nos controles.'),
       reg('Aproveitamento (ALV / gleba)', [calc(function (r) { return pc(r.ind.aproveitamento, 2); })]),
+      reg('Lotes no programa', [calc(function (r) { return n(r.prog.lotes, 0); }),
+        calc(function (r) { return n(r.prog.lotesRes, 0) + ' resid. · ' + n(r.prog.lotesCom, 0) + ' com.'; }, 'fraco')]),
       reg('Preço médio por lote', [calc(function (r) { return R$(r.ind.precoMedioLote); })]),
       reg('Preço médio por m² de ALV', [calc(function (r) { return R$(r.ind.precoMedioM2, 2); })])
     ]));
@@ -498,13 +602,18 @@
         calc(function (r) { return fi + 1 < r.fases.length ? '→ fase ' + (fi + 2) + ' lança no mês ' + n(r.fases[fi + 1].lanc, 0) : 'não há fase seguinte ativa'; }, 'fraco')], null, true)
     ]));
 
-    f.appendChild(quadro('Velocidade por produto', 'lotes vendidos por mês em cada janela', [grade(
-      ['Lançamento', 'Durante a obra', 'Pós-obra'], [0, 1, 2, 3, 4].map(function (p) {
-        return { rot: 'Produto ' + (p + 1), cels: [0, 1, 2].map(function (j) {
-          return calc(function (r) { return n(F(r).lotesMes[p][j], 2); }); }) };
+    f.appendChild(quadro('Velocidade por produto', 'lotes por mês em cada janela · comercial vende em mês único', [grade(
+      ['Lançamento', 'Durante a obra', 'Pós-obra', 'Mês único'], [0, 1, 2, 3, 4].map(function (p) {
+        var com = P.produtos[p].tipo === 'comercial';
+        return { rot: 'Produto ' + (p + 1) + ' · ' + (com ? 'com.' : 'resid.'),
+          cels: [0, 1, 2].map(function (j) {
+            return calc(function (r) { return com ? '—' : n(F(r).lotesMes[p][j], 2); }, com ? 'fraco' : ''); })
+            .concat([calc(function (r) {
+              return com && F(r).lotesProduto[p] > 0
+                ? n(F(r).lotesProduto[p], 0) + ' no mês ' + F(r).mesesCom[p] : '—'; }, 'fraco')]) };
       }))]));
 
-    f.appendChild(quadro('Condições por plano — Produto 1', 'valores a preço da data-base', [grade(
+    f.appendChild(quadro('Condições por plano — Produto 1', 'valores a preço da data-base, sem correção', [grade(
       ['À vista', 'Plano 2', 'Plano 3', 'Plano 4', 'Plano 5'], [
         { rot: 'Entrada / valor à vista (R$)', cels: [0, 1, 2, 3, 4].map(function (i) {
             return calc(function (r) { return r.planosProduto[0][i].n > 0 ? n(r.planosProduto[0][i].entrada, 0) : '—'; }); }) },
@@ -861,23 +970,23 @@
 
   /* ================================================================ abas */
   var ABAS = [
-    { id: 'premissas', rot: 'Premissas', n: '1', render: folhaPremissas },
-    { id: 'v1', rot: 'Vendas F1', n: '2', render: function () { return folhaVendas(0); } },
-    { id: 'v2', rot: 'Vendas F2', n: '3', render: function () { return folhaVendas(1); } },
-    { id: 'v3', rot: 'Vendas F3', n: '4', render: function () { return folhaVendas(2); } },
-    { id: 'v4', rot: 'Vendas F4', n: '5', render: function () { return folhaVendas(3); } },
-    { id: 'fluxo', rot: 'Fluxo de caixa', n: '6', render: folhaFluxo },
-    { id: 'drf', rot: 'Demonstrativo', n: '7', render: folhaDRF },
-    { id: 'auditoria', rot: 'Auditoria', n: '8', render: folhaAuditoria },
-    { id: 'memorial', rot: 'Memorial', n: '9', render: folhaMemorial }
+    { id: 'premissas', rot: 'Premissas', render: folhaPremissas },
+    { id: 'v1', rot: 'Vendas F1', render: function () { return folhaVendas(0); } },
+    { id: 'v2', rot: 'Vendas F2', render: function () { return folhaVendas(1); } },
+    { id: 'v3', rot: 'Vendas F3', render: function () { return folhaVendas(2); } },
+    { id: 'v4', rot: 'Vendas F4', render: function () { return folhaVendas(3); } },
+    { id: 'fluxo', rot: 'Fluxo de caixa', render: folhaFluxo },
+    { id: 'drf', rot: 'Demonstrativo', render: folhaDRF },
+    { id: 'auditoria', rot: 'Auditoria', render: folhaAuditoria },
+    { id: 'memorial', rot: 'Memorial', render: folhaMemorial }
   ];
 
   function montarAbas() {
     var nav = document.getElementById('abas');
     nav.textContent = '';
     ABAS.forEach(function (a) {
-      var b = e('button', { cls: 'aba', role: 'tab', 'aria-selected': a.id === abaAtiva ? 'true' : 'false' },
-        [e('span', { cls: 'n', txt: a.n }), e('span', { txt: a.rot })]);
+      var b = e('button', { cls: 'aba', role: 'tab', 'aria-selected': a.id === abaAtiva ? 'true' : 'false',
+        txt: a.rot });
       b.addEventListener('click', function () { abaAtiva = a.id; montarAbas(); montarFolha(); });
       nav.appendChild(b);
     });
@@ -930,7 +1039,24 @@
           if (!p.terreno) p.terreno = { modo: (p.permuta && p.permuta.modo === 'fixo') ? 'informado' : 'resolver',
             forma: 'permuta', pctDinheiro: .4, valorDinheiro: p.custos ? (p.custos.aquisicao || 0) : 0,
             permutaPct: p.permuta ? p.permuta.valor : .42 };
-          P = p;
+          if (!p.produtos && p.residenciais) {          /* formato anterior: dois quadros separados */
+            p.produtos = p.residenciais.map(function (x) {
+              return { tipo: 'residencial', area: x.area, precoM2: x.precoM2,
+                       pagamento: 'planos', momento: 'Intermediário' };
+            });
+            (p.comerciais || []).forEach(function (c) {
+              var vazio = -1;
+              for (var i = 0; i < p.produtos.length; i++) if (!p.produtos[i].area && vazio < 0) vazio = i;
+              if (vazio < 0 || !c.lotes) return;
+              p.produtos[vazio] = { tipo: 'comercial', area: c.area, precoM2: c.precoM2,
+                                    pagamento: 'avista', momento: c.momento };
+              var fa = Math.max(1, Math.min(4, Math.round(c.fase || 1)));
+              p.quadro[vazio][fa - 1] = c.lotes;
+            });
+            delete p.residenciais; delete p.comerciais;
+          }
+          if (!p.travaALV) p.travaALV = 'travado';
+          if (p.produtos) P = p;
         }
       }
     } catch (err) {}

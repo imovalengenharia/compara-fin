@@ -69,34 +69,41 @@
   }
 
   /* ------------------------------------------------- produto e faseamento */
+  /* Os cinco produtos convivem no mesmo quadro. O tipo define COMO o produto é
+     vendido: o residencial segue a curva de vendas da fase; o comercial é
+     negociado em um único mês. A forma de pagamento é independente do tipo —
+     qualquer produto pode ser vendido à vista ou pelos planos de venda. */
   function programa(P) {
     var nF = Math.max(1, Math.min(4, Math.round(num(P.prazos.nFases, 1))));
-    var res = P.residenciais.map(function (r) {
-      return { area: num(r.area), precoM2: num(r.precoM2), precoLote: num(r.area) * num(r.precoM2) };
-    });
-    var com = P.comerciais.map(function (c) {
-      var precoLote = num(c.area) * num(c.precoM2);
-      return { lotes: num(c.lotes), area: num(c.area), fase: Math.round(num(c.fase, 1)),
-               momento: c.momento || 'Início', precoM2: num(c.precoM2), precoLote: precoLote,
-               vgv: num(c.lotes) * precoLote, alv: num(c.lotes) * num(c.area) };
+    var prods = P.produtos.map(function (p, i) {
+      var tipo = p.tipo === 'comercial' ? 'comercial' : 'residencial';
+      return { n: i + 1, tipo: tipo, area: num(p.area), precoM2: num(p.precoM2),
+               pagamento: p.pagamento === 'avista' ? 'avista' : 'planos',
+               momento: p.momento || 'Intermediário',
+               precoLote: num(p.area) * num(p.precoM2) };
     });
     var fases = [];
     for (var f = 0; f < 4; f++) {
-      var ativa = f < nF, lotes = [], vgv = 0, alv = 0, tot = 0;
-      for (var p = 0; p < 5; p++) {
+      var ativa = f < nF, lotes = [], vgv = 0, alv = 0, tot = 0, totRes = 0, totCom = 0;
+      for (var p = 0; p < prods.length; p++) {
         var q = ativa ? num(P.quadro[p][f]) : 0;
-        lotes.push(q); tot += q; vgv += q * res[p].precoLote; alv += q * res[p].area;
+        lotes.push(q); tot += q; vgv += q * prods[p].precoLote; alv += q * prods[p].area;
+        if (prods[p].tipo === 'comercial') totCom += q; else totRes += q;
       }
-      fases.push({ ativa: ativa, lotes: lotes, totalLotes: tot, vgv: vgv, alv: alv });
+      fases.push({ ativa: ativa, lotes: lotes, totalLotes: tot, totalRes: totRes,
+                   totalCom: totCom, vgv: vgv, alv: alv });
     }
-    var vgvRes = fases.reduce(function (s, x) { return s + x.vgv; }, 0);
-    var vgvCom = com.reduce(function (s, x) { return s + (x.fase <= nF ? x.vgv : 0); }, 0);
-    var alvRes = fases.reduce(function (s, x) { return s + x.alv; }, 0);
-    var alvCom = com.reduce(function (s, x) { return s + (x.fase <= nF ? x.alv : 0); }, 0);
-    var lotesRes = fases.reduce(function (s, x) { return s + x.totalLotes; }, 0);
-    var lotesCom = com.reduce(function (s, x) { return s + (x.fase <= nF ? x.lotes : 0); }, 0);
-    return { nFases: nF, res: res, com: com, fases: fases, vgvRes: vgvRes, vgvCom: vgvCom,
-             vgv: vgvRes + vgvCom, alv: alvRes + alvCom, lotesRes: lotesRes, lotesCom: lotesCom };
+    var som = function (chave) { return fases.reduce(function (a, x) { return a + x[chave]; }, 0); };
+    var vgvRes = 0, vgvCom = 0, alvRes = 0, alvCom = 0;
+    fases.forEach(function (fa) {
+      prods.forEach(function (pr, i) {
+        if (pr.tipo === 'comercial') { vgvCom += fa.lotes[i] * pr.precoLote; alvCom += fa.lotes[i] * pr.area; }
+        else { vgvRes += fa.lotes[i] * pr.precoLote; alvRes += fa.lotes[i] * pr.area; }
+      });
+    });
+    return { nFases: nF, prods: prods, res: prods, fases: fases, vgvRes: vgvRes, vgvCom: vgvCom,
+             vgv: vgvRes + vgvCom, alv: alvRes + alvCom, alvRes: alvRes, alvCom: alvCom,
+             lotes: som('totalLotes'), lotesRes: som('totalRes'), lotesCom: som('totalCom') };
   }
 
   /* ------------------------------------------------------------ vendas */
@@ -116,15 +123,16 @@
       var fimVendas = lanc + janLanc + prazoObra + durPos - 1;
       var velLanc = num(cfg.velLanc), velPos = num(cfg.velPos);
       var velObra = Math.max(0, 1 - velLanc - velPos);   // residual, como L16 da planilha
-      var lotesFase = prog.fases[f].lotes;
+      var lotesFase = prog.fases[f].lotes, prods = prog.prods;
       var vend = [], restante = lotesFase.slice(), acum = [];
-      for (var p = 0; p < 5; p++) vend.push(z());
-      var totalFase = prog.fases[f].totalLotes, vendidos = 0, gat = 1;
+      for (var p = 0; p < prods.length; p++) vend.push(z());
+      var totalRes = prog.fases[f].totalRes, vendidos = 0, gat = 1;
       var achouGatilho = false;
       var duracaoFase = janLanc + prazoObra + durPos;
       for (var j = 1; j <= duracaoFase; j++) {
         var m = lanc + j - 1;
-        for (var p2 = 0; p2 < 5; p2++) {
+        for (var p2 = 0; p2 < prods.length; p2++) {
+          if (prods[p2].tipo === 'comercial') continue;   // vendido em mês único, fora da curva
           var taxa = j <= janLanc ? lotesFase[p2] * velLanc / janLanc
                    : j <= janLanc + prazoObra ? lotesFase[p2] * velObra / prazoObra
                    : lotesFase[p2] * velPos / durPos;
@@ -133,11 +141,19 @@
           if (m < HORIZONTE) vend[p2][m] = v;
           vendidos += v;
         }
-        var pct = totalFase > 0 ? vendidos / totalFase : 0;
+        var pct = totalRes > 0 ? vendidos / totalRes : 0;
         acum.push(pct);
         if (!achouGatilho && pct > num(cfg.gatilho, 0.7)) { gat = j; achouGatilho = true; }
       }
       if (!achouGatilho) gat = duracaoFase;
+      /* produtos comerciais: todo o lote da fase negociado no mês escolhido */
+      var mesesCom = [];
+      prods.forEach(function (pr, p3) {
+        if (pr.tipo !== 'comercial') { mesesCom.push(null); return; }
+        var mCom = pr.momento === 'Início' ? lanc : pr.momento === 'Fim' ? fimVendas : obraFim;
+        mesesCom.push(mCom);
+        if (lotesFase[p3] > 0 && mCom < HORIZONTE) vend[p3][mCom] += lotesFase[p3];
+      });
       var dEt = Math.trunc(prazoObra / 4), durs = [dEt, dEt, dEt, prazoObra - 3 * dEt];
       var pcts = [num(cfg.etapa1), num(cfg.etapa2), num(cfg.etapa3)];
       pcts.push(1 - pcts[0] - pcts[1] - pcts[2]);
@@ -153,15 +169,18 @@
           residual: true },
         { nome: 'Pós-obra',      pct: velPos,  dur: durPos,    vso: durPos ? velPos / durPos : 0 }
       ];
-      var lotesMes = lotesFase.map(function (q) {
+      var lotesMes = lotesFase.map(function (q, p4) {
+        if (prods[p4].tipo === 'comercial') return [0, 0, 0];
         return janelas.map(function (j) { return j.dur ? q * j.pct / j.dur : 0; });
       });
       fases.push({ i: f + 1, lanc: lanc, lancFim: lanc + janLanc - 1, janLanc: janLanc,
                    obraIni: obraIni, prazoObra: prazoObra, obraFim: obraFim,
                    obraUltimoMes: obraIni + prazoObra - 1, durPos: durPos, fimVendas: fimVendas,
-                   velLanc: velLanc, velObra: velObra, velPos: velPos, lotes: totalFase,
+                   velLanc: velLanc, velObra: velObra, velPos: velPos, lotes: prog.fases[f].totalLotes,
                    lotesProduto: lotesFase.slice(), etapas: etapas, janelas: janelas,
-                   lotesMes: lotesMes, gatilho: num(cfg.gatilho, 0.7), mesGatilho: lanc + gat - 1,
+                   lotesMes: lotesMes, mesesCom: mesesCom, lotesRes: prog.fases[f].totalRes,
+                   lotesCom: prog.fases[f].totalCom,
+                   gatilho: num(cfg.gatilho, 0.7), mesGatilho: lanc + gat - 1,
                    pctAcum: acum });
       vendas.push(vend);
       lancAnterior = lanc; gatilhoAnterior = gat;
@@ -207,17 +226,11 @@
       }
     }
     for (var f = 0; f < cron.fases.length; f++) {
-      for (var p = 0; p < 5; p++) {
-        var serie = cron.vendas[f][p], preco = prog.res[p].precoLote;
-        for (var m = 0; m < N; m++) if (serie[m] > 0) vender(serie[m], preco, m, f, false);
+      for (var p = 0; p < prog.prods.length; p++) {
+        var pr = prog.prods[p], serie = cron.vendas[f][p], avista = pr.pagamento === 'avista';
+        for (var m = 0; m < N; m++) if (serie[m] > 0) vender(serie[m], pr.precoLote, m, f, avista);
       }
     }
-    prog.com.forEach(function (c) {
-      if (c.lotes <= 0 || c.fase > cron.fases.length) return;
-      var fa = cron.fases[c.fase - 1];
-      var m = c.momento === 'Início' ? fa.lanc : c.momento === 'Fim' ? fa.fimVendas : fa.obraFim;
-      vender(c.lotes, c.precoLote, m, c.fase - 1, true);
-    });
     var ultimo = 0;
     for (var q = 0; q < N; q++) if (rec[q] > 0.5) ultimo = q;
     return { rec: rec, vgvVendido: vgvVendido, entradas: entradas, parcelas: parcelas,
@@ -258,11 +271,11 @@
     espalhar(col.preop, preOpV, num(J.preOpIni, 1), Math.max(1, Math.round(num(P.prazos.preOp))), fIPCA);
 
     var pesoFase = cron.fases.map(function (fa) {
-      return prog.fases[fa.i - 1].totalLotes / Math.max(1, prog.lotesRes);
+      return prog.fases[fa.i - 1].totalLotes / Math.max(1, prog.lotes);
     });
     var obraFase = [0, 0, 0, 0];
     cron.fases.forEach(function (fa, i) {
-      var peso = prog.fases[i].totalLotes / Math.max(1, prog.lotesRes);
+      var peso = prog.fases[i].totalLotes / Math.max(1, prog.lotes);
       obraFase[i] = obraExec * peso;
       var etapas = [num(P.fases[i].etapa1), num(P.fases[i].etapa2), num(P.fases[i].etapa3)];
       etapas.push(1 - etapas[0] - etapas[1] - etapas[2]);
@@ -489,7 +502,7 @@
 
     var alvFolga = areas.alvDisponivel - prog.alv;
     var checks = [
-      { ok: prog.nFases >= 1 && prog.lotesRes > 0, txt: 'Há ao menos uma fase ativa e um lote no programa' },
+      { ok: prog.nFases >= 1 && prog.lotes > 0, txt: 'Há ao menos uma fase ativa e um lote no programa' },
       { ok: Math.abs(P.planos.reduce(function (s, p) { return s + num(p.mix); }, 0) - 1) < 0.0001,
         txt: 'O mix dos planos de venda soma 100%' },
       { ok: num(P.planos[0].entrada) === 1, txt: 'O plano à vista tem 100% de entrada' },
@@ -503,7 +516,7 @@
       { ok: R.ultimoRecebimento <= HORIZONTE - 1, txt: 'O ciclo de recebimentos cabe no horizonte' },
       { ok: tirReal !== null, txt: 'A TIR converge' },
       { ok: tma < num(idx.cdi) * num(idx.multiplo) + 1e-9, txt: 'A TMA está em termos reais, comparável com a TIR' },
-      { ok: prog.res.every(function (r, i) {
+      { ok: prog.prods.every(function (r, i) {
           var usado = P.quadro[i].reduce(function (s, q) { return s + num(q); }, 0);
           return usado === 0 || (r.area > 0 && r.precoM2 > 0); }),
         txt: 'Todo produto com lotes lançados tem área e preço' },
@@ -513,19 +526,22 @@
       { ok: areas.gleba > 0 && areas.totalPerdas < areas.gleba, txt: 'O quadro de áreas fecha' }
     ];
 
-    /* Mês em que cada lote comercial é vendido (à vista), como PREMISSAS linha 26 */
-    var comerciais = prog.com.map(function (c) {
-      var ativo = c.fase <= cron.fases.length && c.lotes > 0;
-      var fa = ativo ? cron.fases[c.fase - 1] : null;
-      return { lotes: c.lotes, area: c.area, fase: c.fase, momento: c.momento, precoM2: c.precoM2,
-               precoLote: c.precoLote, vgv: c.vgv, alv: c.alv, ativo: ativo,
-               mes: !ativo ? null : c.momento === 'Início' ? fa.lanc
-                    : c.momento === 'Fim' ? fa.fimVendas : fa.obraFim };
+    /* Resumo por produto, com o mês de venda dos comerciais em cada fase ativa */
+    var produtos = prog.prods.map(function (pr, i) {
+      var lotes = 0, vgv = 0, alv = 0, meses = [];
+      cron.fases.forEach(function (fa, f) {
+        var q = prog.fases[f].lotes[i];
+        lotes += q; vgv += q * pr.precoLote; alv += q * pr.area;
+        if (pr.tipo === 'comercial' && q > 0) meses.push({ fase: fa.i, mes: fa.mesesCom[i] });
+      });
+      return { n: pr.n, tipo: pr.tipo, area: pr.area, precoM2: pr.precoM2, precoLote: pr.precoLote,
+               pagamento: pr.pagamento, momento: pr.momento, lotes: lotes, vgv: vgv, alv: alv,
+               meses: meses };
     });
 
     /* Condições de cada plano sobre cada produto residencial (VENDAS linhas 29 a 31) */
     var ipcaN = num(P.indices.ipca);
-    var planosProduto = prog.res.map(function (r) {
+    var planosProduto = prog.prods.map(function (r) {
       return P.planos.map(function (pl) {
         var n = Math.round(num(pl.n)), liquido = r.precoLote * (1 - num(pl.desconto));
         var entrada = liquido * num(pl.entrada), fin = liquido - entrada;
@@ -556,13 +572,13 @@
 
     return {
       colunas: COLUNAS, meses: meses, totais: totais, areas: areas, prog: prog,
-      fases: cron.fases, valores: M.valores, checks: checks, comerciais: comerciais,
+      fases: cron.fases, valores: M.valores, checks: checks, produtos: produtos,
       planosProduto: planosProduto, resultadoFase: resultadoFase, permutaSerie: M.col.permuta,
       ind: {
         vgv: prog.vgv, vgvRes: prog.vgvRes, vgvCom: prog.vgvCom, alvUsada: prog.alv,
         alvFolga: alvFolga, aproveitamento: areas.gleba > 0 ? prog.alv / areas.gleba : 0,
-        precoMedioLote: prog.lotesRes > 0 ? prog.vgvRes / prog.lotesRes : 0,
-        precoMedioM2: prog.alv > 0 ? prog.vgvRes / prog.alv : 0,
+        precoMedioLote: prog.lotes > 0 ? prog.vgv / prog.lotes : 0,
+        precoMedioM2: prog.alv > 0 ? prog.vgv / prog.alv : 0,
         permutaPct: permPct, vpPermuta: M.vpPermuta, taxaTerrenista: taxaTerrenista,
         valorTerreno: M.valorTerreno, caixaTerreno: M.caixaTerreno, vpCaixa: M.vpCaixa,
         formaTerreno: T.forma, modoTerreno: T.modo, pctDinheiroEfetivo: M.valorTerreno > 0 ? M.vpCaixa / M.valorTerreno : 0,
@@ -577,7 +593,7 @@
         investimento: investimento, retorno: retorno,
         multiplo: investimento > 0 ? retorno / investimento : 0,
         ciclo: ciclo, ultimoRecebimento: R.ultimoRecebimento, aporte: INV.aporte,
-        resultadoPorLote: (prog.lotesRes + prog.lotesCom) > 0 ? resultado / (prog.lotesRes + prog.lotesCom) : 0,
+        resultadoPorLote: prog.lotes > 0 ? resultado / prog.lotes : 0,
         resultadoPorM2: prog.alv > 0 ? resultado / prog.alv : 0
       }
     };

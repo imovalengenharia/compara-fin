@@ -35,13 +35,13 @@ function ITU(over) {
     areas: { gleba: 160084, viario: 0.24022388246170762, doacoes: 0.025,
              verdes: 0.1288136228480048, lazer: 0.10466942355263506, faixa: 14408, restricao: 0 },
     prazos: { preOp: 18, nFases: 1 },
-    residenciais: [{ area: 391.406, precoM2: 1250 }, { area: 0, precoM2: 0 }, { area: 0, precoM2: 0 },
-                   { area: 0, precoM2: 0 }, { area: 0, precoM2: 0 }],
-    quadro: [[164, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0], [0, 0, 0, 0]],
-    comerciais: [{ lotes: 1, area: 800, fase: 1, momento: 'Intermediário', precoM2: 1250 },
-                 { lotes: 4, area: 85, fase: 1, momento: 'Início', precoM2: 1250 },
-                 { lotes: 4, area: 85, fase: 1, momento: 'Intermediário', precoM2: 1250 },
-                 { lotes: 2, area: 85, fase: 1, momento: 'Fim', precoM2: 1250 }],
+    produtos: [
+      { tipo: 'residencial', area: 391.406, precoM2: 1250, pagamento: 'planos', momento: 'Intermediário' },
+      { tipo: 'comercial', area: 800, precoM2: 1250, pagamento: 'avista', momento: 'Intermediário' },
+      { tipo: 'comercial', area: 85, precoM2: 1250, pagamento: 'avista', momento: 'Início' },
+      { tipo: 'comercial', area: 85, precoM2: 1250, pagamento: 'avista', momento: 'Intermediário' },
+      { tipo: 'comercial', area: 85, precoM2: 1250, pagamento: 'avista', momento: 'Fim' }],
+    quadro: [[164, 0, 0, 0], [1, 0, 0, 0], [4, 0, 0, 0], [4, 0, 0, 0], [2, 0, 0, 0]],
     planos: [{ n: 1, mix: 0.2, entrada: 1, desconto: 0.05, correcao: 0.05, jurosReal: 0 },
              { n: 120, mix: 0.5, entrada: 0.15, desconto: 0, correcao: 0.05, jurosReal: 0.08 },
              { n: 180, mix: 0.3, entrada: 0.15, desconto: 0, correcao: 0.05, jurosReal: 0.08 },
@@ -159,7 +159,7 @@ function teto(over) { return Motor.calcular(ITU(over)).ind.valorTerreno; }
 var base = teto(function () {});
 conferir('obra +10% reduz o teto', teto(function (P) { P.custos.obraM2 = 330; }) < base, true);
 conferir('preço +10% aumenta o teto', teto(function (P) {
-  P.residenciais[0].precoM2 = 1375; P.comerciais.forEach(function (c) { c.precoM2 = 1375; }); }) > base, true);
+  P.produtos.forEach(function (c) { if (c.precoM2) c.precoM2 = 1375; }); }) > base, true);
 conferir('TMA maior reduz o teto', teto(function (P) { P.indices.multiplo = 2.4; }) < base, true);
 conferir('venda mais rápida aumenta o teto', teto(function (P) {
   P.fases[0].velLanc = 0.35; P.fases[0].velPos = 0.1; }) > base, true);
@@ -191,12 +191,13 @@ function checar(P, nome, chave) {
   conferir(nome, !!c && !c.ok, true);
   return r;
 }
-checar(ITU(function (P) { P.quadro[0][0] = 0; }), 'zero lotes é acusado', 'fase ativa');
+checar(ITU(function (P) { P.quadro.forEach(function (l) { l[0] = 0; }); }), 'zero lotes é acusado', 'fase ativa');
 checar(ITU(function (P) { P.planos[1].mix = 0.7; }), 'mix diferente de 100% é acusado', 'mix');
 checar(ITU(function (P) { P.quadro[0][0] = 400; }), 'ALV insuficiente é acusada', 'cabe na ALV');
 var quatro = Motor.calcular(ITU(function (P) {
   P.prazos.nFases = 4;
   P.quadro[0] = [60, 40, 34, 30];
+  P.quadro[1] = [1, 0, 0, 0];
 }));
 conferir('4 fases: lançamentos em cadeia crescente',
   quatro.fases.every(function (f, i) { return i === 0 || f.lanc > quatro.fases[i - 1].lanc; }), true);
@@ -205,7 +206,7 @@ conferir('4 fases: soma das fases = resultado',
   soma(quatro.resultadoFase.map(function (f) { return f.resultado; })), quatro.ind.resultado, { abs: 1 });
 conferir('4 fases: VPL zerado', quatro.ind.vpl, 0, { abs: 500 });
 conferir('4 fases: ciclo dentro do horizonte', quatro.ind.ultimoRecebimento < 420, true);
-var semReceita = Motor.calcular(ITU(function (P) { P.residenciais[0].precoM2 = 0; P.comerciais.forEach(function (c) { c.precoM2 = 0; }); }));
+var semReceita = Motor.calcular(ITU(function (P) { P.produtos.forEach(function (c) { c.precoM2 = 0; }); }));
 conferir('sem receita: não quebra e o teto é zero', semReceita.ind.valorTerreno <= 1, true);
 
 /* ------------------------------------------------------------- resultado */
