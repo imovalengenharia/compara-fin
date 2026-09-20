@@ -20,7 +20,6 @@
         { tipo: 'comercial', area: 85, precoM2: 1250, pagamento: 'avista', momento: 'Intermediário' },
         { tipo: 'comercial', area: 85, precoM2: 1250, pagamento: 'avista', momento: 'Fim' }],
       quadro: [[164, 0, 0, 0], [1, 0, 0, 0], [4, 0, 0, 0], [4, 0, 0, 0], [2, 0, 0, 0]],
-      travaALV: 'travado',
       planos: [{ n: 1, mix: 0.2, entrada: 1, desconto: 0.05, correcao: 0.05, jurosReal: 0 },
                { n: 120, mix: 0.5, entrada: 0.15, desconto: 0, correcao: 0.05, jurosReal: 0.08 },
                { n: 180, mix: 0.3, entrada: 0.15, desconto: 0, correcao: 0.05, jurosReal: 0.08 },
@@ -95,6 +94,12 @@
     }
     return t;
   }
+  /* A ALV é um limite físico: o programa nunca pode ultrapassá-la. Quando o
+     campo editado permite, ele é ajustado ao máximo possível; quando não
+     permite (mudar o nº de fases, encolher a gleba, aumentar as perdas), a
+     alteração é desfeita e a plataforma explica o que precisa mudar antes. */
+  function alvUsadaTotal() { return alvUsadaExcluindo(-1, null); }
+  function excessoALV() { return Math.max(0, alvUsadaTotal() - alvDisponivelP()); }
   var tempoAviso = null;
   function avisar(titulo, texto) {
     var velho = document.getElementById('aviso-flutuante');
@@ -114,7 +119,6 @@
   }
   /* Impede lançar lotes ou ampliar o lote além do que a gleba comporta. */
   function travarALV(el, caminho) {
-    if (P.travaALV === 'livre') return;
     var disp = alvDisponivelP(), nF = nFasesP();
     var q = /^quadro\.(\d+)\.(\d+)$/.exec(caminho);
     if (q) {
@@ -156,9 +160,26 @@
       v = parseFloat(String(el.value).replace(',', '.'));
       if (!isFinite(v)) v = 0;
       if (t === 'pct') v = v / 100;
+      if (el.dataset.max !== undefined && v > +el.dataset.max) { v = +el.dataset.max; el.value = v; }
+      if (ev.type === 'change' && el.dataset.min !== undefined && v < +el.dataset.min) {
+        v = +el.dataset.min; el.value = v;
+      }
     }
+    var anterior = pegar(c), excessoAntes = excessoALV();
     guardar(c, v);
     travarALV(el, c);
+    /* desfaz apenas o que PIORA o excesso — assim um programa já estourado
+       (vindo de um arquivo salvo) continua editável para caber de novo */
+    if (excessoALV() > excessoAntes + 0.5) {
+      var excesso = excessoALV();
+      guardar(c, anterior);
+      el.value = (t === 'pct') ? Math.round((anterior || 0) * 1e6) / 1e4 : anterior;
+      el.classList.add('limitado');
+      setTimeout(function () { el.classList.remove('limitado'); }, 2200);
+      avisar('Limite da ALV', 'Esta alteração deixaria o programa com ' + n(excesso, 0) +
+        ' m² além da área líquida vendável. Reduza lotes ou a área do lote no quadro de fases antes de aplicá-la.');
+      return;
+    }
     var remonta = el.dataset.remonta === '1';
     clearTimeout(timer);
     timer = setTimeout(function () { recalcular(); if (remonta) montarFolha(true); }, 80);
@@ -178,7 +199,10 @@
     } else {
       if (tipo === 'pct') v = (v || 0) * 100;
       el = e('input', { id: 'c_' + caminho, type: 'number', step: opts.step || 'any',
+                        min: opts.min, max: opts.max,
                         value: v == null ? '' : Math.round(v * 1e6) / 1e6 });
+      if (opts.min !== undefined) el.dataset.min = opts.min;
+      if (opts.max !== undefined) el.dataset.max = opts.max;
     }
     el.dataset.caminho = caminho; el.dataset.tipo = tipo;
     if (opts.remonta) el.dataset.remonta = '1';
@@ -209,7 +233,10 @@
       var comp = temUn ? celulas[2] : celulas[1];
       linha.appendChild(e('div', { cls: 'comp' }, comp ? [comp] : []));
     }
-    linha.appendChild(e('div', { cls: 'nota', txt: nota || '' }));
+    var nd = e('div', { cls: 'nota' });
+    if (typeof nota === 'function') atualizadores.push(function (r) { nd.textContent = nota(r); });
+    else nd.textContent = nota || '';
+    linha.appendChild(nd);
     return linha;
   }
 
@@ -266,9 +293,8 @@
     ].forEach(function (d, i) {
       var chave = d[0];
       if (d[2] === 'pct') {
-        areas.push(reg(d[1], [
-          calc(function (r) { return n(r.areas.perdas[i].m2, 0) + ' m²'; }, 'fraco'),
-          inp('areas.' + chave, 'pct'), un('%')], d[3]));
+        areas.push(reg(d[1], [inp('areas.' + chave, 'pct'), un('%'),
+          calc(function (r) { return n(r.areas.perdas[i].m2, 0) + ' m²'; }, 'fraco')], d[3]));
       } else {
         areas.push(reg(d[1], [inp('areas.' + chave, 'num'), un('m²'),
           calc(function (r) { return pc(r.areas.perdas[i].pct, 2); }, 'fraco')], d[3]));
@@ -284,13 +310,13 @@
     f.appendChild(quadro('Quadro de áreas', 'condição · área · % sobre a gleba', areas));
 
     /* 2 — eventos e faseamento */
-    f.appendChild(quadro('Eventos e faseamento', null, [
-      reg('Mês base do estudo', [e('span', { cls: 'calc fraco', txt: 'mês 0' })],
-        'Data-base da análise: a decisão de compra do terreno.'),
-      reg('Pré-operacionais — duração', [inp('prazos.preOp', 'num', { step: 1 }), un('meses'),
-        calc(function (r) { return 'termina no mês ' + n(P.prazos.preOp, 0); }, 'fraco')],
-        'Meses até o lançamento da 1ª fase: aprovações, registro e projetos.'),
-      reg('Nº de fases do projeto', [inp('prazos.nFases', 'num', { step: 1 }), un('1 a 4')],
+    f.appendChild(quadro('Eventos e faseamento', 'o mês 0 é a data-base do estudo', [
+      reg('Pré-operacionais', [inp('prazos.preOp', 'num', { step: 1, min: 0, max: 120 }), un('meses')],
+        function (r) {
+          return 'Aprovações, registro, projetos e licenciamento. Terminam no mês ' +
+            n(Math.round(+P.prazos.preOp || 0), 0) + ', quando a 1ª fase é lançada.';
+        }),
+      reg('Nº de fases do projeto', [inp('prazos.nFases', 'num', { step: 1, min: 1, max: 4 }), un('fases')],
         'Cada fase tem obra, lançamento e curva de vendas próprios. As fases inativas não entram em nada.')
     ]));
 
@@ -340,9 +366,7 @@
       [grade(colFases, linhasFase),
        reg('Saldo de ALV', [calc(function (r) { return n(r.ind.alvFolga, 0) + ' m²'; }),
          calc(function (r) { return r.ind.alvFolga >= -0.5 ? 'cabe na gleba' : 'NÃO CABE'; }, 'fraco')],
-         P.travaALV === 'travado'
-           ? 'Com a trava ligada, a plataforma limita o lançamento ao que a ALV comporta.'
-           : 'Trava desligada: é possível lançar mais do que a gleba comporta.', true)],
+         'A ALV disponível é o teto físico do programa: a plataforma não deixa ultrapassá-la.', true)],
       'Só as fases ativas entram no cálculo. A distribuição não precisa ser igual entre fases — normalmente não é.'));
 
     /* 5 — resumo do programa (depende de tudo acima) */
@@ -357,8 +381,6 @@
       reg('Saldo de ALV', [calc(function (r) { return n(r.ind.alvFolga, 0) + ' m²'; }),
         calc(function (r) { return r.ind.alvFolga >= -0.5 ? 'ALV suficiente' : 'ALV INSUFICIENTE'; }, 'fraco')],
         'Disponível menos utilizada.', true),
-      reg('Trava da ALV', [inp('travaALV', 'sel', { opcoes: ['travado', 'livre'], remonta: true })],
-        'Travado: a plataforma impede lançar lotes ou ampliar o lote além do que a gleba comporta, e avisa qual é o máximo. Livre: permite ultrapassar, e o saldo negativo fica acusado nos controles.'),
       reg('Aproveitamento (ALV / gleba)', [calc(function (r) { return pc(r.ind.aproveitamento, 2); })]),
       reg('Lotes no programa', [calc(function (r) { return n(r.prog.lotes, 0); }),
         calc(function (r) { return n(r.prog.lotesRes, 0) + ' resid. · ' + n(r.prog.lotesCom, 0) + ' com.'; }, 'fraco')]),
@@ -1055,7 +1077,6 @@
             });
             delete p.residenciais; delete p.comerciais;
           }
-          if (!p.travaALV) p.travaALV = 'travado';
           if (p.produtos) P = p;
         }
       }
