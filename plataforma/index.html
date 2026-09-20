@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Involutivo de glebas</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+<header class="topo">
+  <span class="marca">
+    <svg width="24" height="24" viewBox="0 0 26 26" aria-hidden="true"><path d="M2.5 20.5 L9.5 8 L14.5 16.5 L17.8 11 L23.5 20.5 Z" stroke="#0A5E4C" stroke-width="1.6" stroke-linejoin="round" fill="none"></path><circle cx="20" cy="5.6" r="2.3" stroke="#B8862B" stroke-width="1.4" fill="none"></circle></svg>
+    <strong>Involutivo</strong><span class="selo">GLEBAS URBANIZÁVEIS</span>
+  </span>
+  <span id="titulo-estudo" style="font-size:13px;color:#5F6A64"></span>
+  <span class="cresce"></span>
+  <span id="status" style="font-size:12px;color:#5F6A64"></span>
+  <button class="btn" id="btn-restaurar" type="button">Restaurar padrão</button>
+  <button class="btn" id="btn-json" type="button">Salvar premissas</button>
+  <label class="btn" for="arquivo-json" style="display:inline-block">Abrir premissas
+    <input type="file" id="arquivo-json" accept="application/json" hidden></label>
+  <button class="btn forte" id="btn-csv" type="button">Exportar fluxo (CSV)</button>
+</header>
+
+<div class="corpo">
+  <form class="painel" id="painel" autocomplete="off"></form>
+  <main class="saida">
+    <div class="abas" role="tablist">
+      <button class="aba" role="tab" data-aba="resumo" aria-selected="true">Resumo</button>
+      <button class="aba" role="tab" data-aba="fluxo" aria-selected="false">Fluxo de caixa mensal</button>
+      <button class="aba" role="tab" data-aba="drf" aria-selected="false">Demonstrativo</button>
+      <button class="aba" role="tab" data-aba="vendas" aria-selected="false">Vendas e cronograma</button>
+    </div>
+    <section id="painel-resumo" role="tabpanel"></section>
+    <section id="painel-fluxo" role="tabpanel" hidden></section>
+    <section id="painel-drf" role="tabpanel" hidden></section>
+    <section id="painel-vendas" role="tabpanel" hidden></section>
+  </main>
+</div>
+
+<script src="motor.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

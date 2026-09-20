@@ -37,6 +37,11 @@ UPLOAD_DIR.mkdir(exist_ok=True)
 
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
+# Plataforma de involutivo (front-end estático em /plataforma)
+PLATAFORMA_DIR = BASE / "plataforma"
+if PLATAFORMA_DIR.exists():
+    app.mount("/plataforma", StaticFiles(directory=PLATAFORMA_DIR, html=True), name="plataforma")
+
 # ─────────────────────────────────────────────────────────────────────────────
 # AUTENTICAÇÃO (simples, para protótipo — trocar por banco de dados em produção)
 # Senha guardada como hash. Em produção: tabela de usuários + bcrypt.
