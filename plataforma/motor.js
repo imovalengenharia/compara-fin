@@ -225,7 +225,7 @@
   }
 
   /* --------------------------------------------------- contas e fluxo */
-  function montar(P, prog, cron, R, permPct, vpPermuta) {
+  function montar(P, prog, cron, R, permPct, caixaTerreno, vpPermuta) {
     var N = HORIZONTE, C = P.custos, J = P.janelas, idx = P.indices;
     var ipca = num(idx.ipca), incc = num(idx.incc);
     var fINCC = function (m) { return Math.pow((1 + incc) / (1 + ipca), m / 12); };
@@ -236,7 +236,7 @@
     var obraTotal = C.criterio === 'Critério 2' ? num(C.obraPctVGV) * prog.vgv : num(C.obraM2) * prog.alv;
     var preOpV = num(C.pctPreOp) * obraTotal;
     var obraExec = obraTotal - preOpV;
-    var aquisicao = num(C.aquisicao);
+    var aquisicao = num(caixaTerreno);
     var itbiV = num(C.outrosTerreno) * (aquisicao + vpPermuta);
     var contrapV = num(C.contrapartidas) * prog.vgv;
     var manutV = num(C.manutencao) * obraTotal;
@@ -390,30 +390,72 @@
     var tma = (1 + num(idx.cdi) * num(idx.multiplo)) / (1 + num(idx.ipca)) - 1;
     var taxaTerrenista = (1 + num(idx.cdi)) / (1 + num(idx.ipca)) - 1;
 
-    /* O ITBI depende do valor da gleba, que depende do fluxo: itera até fechar. */
-    function rodar(permPct) {
+    /* ---------------------------------------------------------------------
+       VALOR DO TERRENO — o involutivo propriamente dito.
+       A TIR fica travada na TMA: o valor da gleba é o que resta depois de
+       todas as receitas e despesas, e entra no fluxo até zerar o VPL.
+       O usuário escolhe COMO esse valor é pago: à vista, por permuta
+       financeira (% da receita líquida) ou misto.
+       O ITBI incide sobre o equivalente à vista, e ele próprio depende do
+       valor — por isso cada avaliação itera até fechar.
+       ------------------------------------------------------------------- */
+    var T = P.terreno || { modo: 'resolver', forma: 'permuta', pctDinheiro: 0,
+                           valorDinheiro: 0, permutaPct: 0.42 };
+    var alfa = T.forma === 'avista' ? 1 : T.forma === 'permuta' ? 0
+             : Math.max(0, Math.min(1, num(T.pctDinheiro)));
+
+    /* Fatores lineares: a permuta é proporcional a p e o caixa é proporcional ao
+       valor nominal, então basta medir uma unidade de cada. */
+    var base = montar(P, prog, cron, R, 0, 0, 0);
+    var unitPerm = z();
+    for (var u = 0; u < HORIZONTE; u++) unitPerm[u] = Math.max(0, base.liquida[u]);
+    var vpUnitPerm = vpl(unitPerm, taxaTerrenista);
+    var kParc = Math.max(1, Math.round(num(P.janelas.terrenoParc, 1)));
+    var mIni = num(P.janelas.terrenoIni, 0);
+    var unitCaixa = z();
+    for (var q2 = 0; q2 < kParc; q2++) {
+      var mm = Math.round(mIni + q2);
+      if (mm >= 0 && mm < HORIZONTE) unitCaixa[mm] += (1 / kParc) * Math.pow(1 + num(idx.ipca), -mm / 12);
+    }
+    var vpUnitCaixa = vpl(unitCaixa, taxaTerrenista) || 1;
+
+    function rodar(caixa, permPct) {
       var vp = 0, M = null;
       for (var it = 0; it < 4; it++) {
-        M = montar(P, prog, cron, R, permPct, vp);
+        M = montar(P, prog, cron, R, permPct, caixa, vp);
         vp = Math.abs(vpl(M.col.permuta, taxaTerrenista));
       }
-      M.vpPermuta = vp;
+      M.vpPermuta = vp; M.caixaTerreno = caixa; M.permPct = permPct;
+      M.vpCaixa = caixa * vpUnitCaixa;
+      M.valorTerreno = M.vpCaixa + vp;
       return M;
     }
-    var permPct, M;
-    if (P.permuta.modo === 'resolver') {
-      var lo = 0, hi = 0.98;
-      for (var k = 0; k < 40; k++) {
-        permPct = (lo + hi) / 2;
-        var teste = rodar(permPct);
-        var vplTeste = vplInvestidor(fluxoInvestidor(teste.fluxo, R.ultimoRecebimento).AW, tma);
-        if (vplTeste > 0) lo = permPct; else hi = permPct;
-      }
-      permPct = (lo + hi) / 2;
-    } else {
-      permPct = num(P.permuta.valor);
+    /* Reparte um valor de gleba V entre caixa e permuta, conforme a forma escolhida */
+    function repartir(V) {
+      var caixa = vpUnitCaixa > 0 ? (alfa * V) / vpUnitCaixa : 0;
+      var p = vpUnitPerm > 0 ? ((1 - alfa) * V) / vpUnitPerm : 0;
+      return { caixa: caixa, p: p };
     }
-    M = rodar(permPct);
+
+    var permPct, caixaTerreno, M, excedePermuta = false;
+    if (T.modo === 'informado') {
+      caixaTerreno = num(T.valorDinheiro);
+      permPct = num(T.permutaPct);
+      M = rodar(caixaTerreno, permPct);
+    } else {
+      var lo = 0, hi = Math.max(1e6, prog.vgv * 2);
+      for (var k3 = 0; k3 < 60; k3++) {
+        var mid = (lo + hi) / 2, d = repartir(mid);
+        var ensaio = rodar(d.caixa, Math.min(1, d.p));
+        var vplEnsaio = vplInvestidor(fluxoInvestidor(ensaio.fluxo, R.ultimoRecebimento).AW, tma);
+        if (vplEnsaio > 0) lo = mid; else hi = mid;
+      }
+      var fim = repartir((lo + hi) / 2);
+      excedePermuta = fim.p > 1;
+      permPct = Math.min(1, fim.p);
+      caixaTerreno = fim.caixa;
+      M = rodar(caixaTerreno, permPct);
+    }
 
     var N = HORIZONTE, fluxo = M.fluxo, acum = M.acum;
 
@@ -522,7 +564,12 @@
         precoMedioLote: prog.lotesRes > 0 ? prog.vgvRes / prog.lotesRes : 0,
         precoMedioM2: prog.alv > 0 ? prog.vgvRes / prog.alv : 0,
         permutaPct: permPct, vpPermuta: M.vpPermuta, taxaTerrenista: taxaTerrenista,
-        valorM2Gleba: areas.gleba > 0 ? M.vpPermuta / areas.gleba : 0,
+        valorTerreno: M.valorTerreno, caixaTerreno: M.caixaTerreno, vpCaixa: M.vpCaixa,
+        formaTerreno: T.forma, modoTerreno: T.modo, pctDinheiroEfetivo: M.valorTerreno > 0 ? M.vpCaixa / M.valorTerreno : 0,
+        excedePermuta: excedePermuta, parcelasTerreno: kParc, mesTerreno: mIni,
+        valorM2Gleba: areas.gleba > 0 ? M.valorTerreno / areas.gleba : 0,
+        valorM2ALV: prog.alv > 0 ? M.valorTerreno / prog.alv : 0,
+        itbi: M.valores.itbiV,
         tma: tma, tir: tirReal, vpl: vplInvestidor(INV.AW, tma), resultado: resultado,
         receita: receitaTot, margemReceita: receitaTot > 0 ? resultado / receitaTot : 0,
         margemVGV: prog.vgv > 0 ? resultado / prog.vgv : 0,

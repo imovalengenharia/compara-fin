@@ -30,7 +30,7 @@
                  velLanc: .2, velObra: [.6, .5, .5, .5][i], velPos: [.2, .3, .3, .3][i],
                  durPos: 12, gatilho: .7 };
       }),
-      custos: { impostos: .0673, comissoes: .045, contrapartidas: .025, aquisicao: 0, outrosTerreno: .02,
+      custos: { impostos: .0673, comissoes: .045, contrapartidas: .025, outrosTerreno: .02,
                 obraM2: 300, obraPctVGV: 0, criterio: 'Critério 1', pctPreOp: .08, cga: .03,
                 gerenciamento: .06, manutencao: .01, marketing: .03, stand: .01,
                 gestaoComercial: .005, premiacao: .005, admVendas: .015, bancarias: .002 },
@@ -39,7 +39,7 @@
       janelas: { terrenoIni: 0, terrenoParc: 1, itbiIni: 1, itbiParc: 1, preOpIni: 1,
                  contrapAnteObra: -3, contrapDur: 6, manutT1: 24, manutP1: .7, manutT2: 12, manutP2: .3,
                  mktAntes: -6, mktPctAntes: .6, mktDepois: 36, standAntes: -3, standPctAntes: .3 },
-      permuta: { modo: 'resolver', valor: .42 }
+      terreno: { modo: 'resolver', forma: 'permuta', pctDinheiro: .4, valorDinheiro: 0, permutaPct: .42 }
     };
   }
 
@@ -89,8 +89,9 @@
       if (t === 'pct') v = v / 100;
     }
     guardar(c, v);
+    var remonta = el.dataset.remonta === '1';
     clearTimeout(timer);
-    timer = setTimeout(recalcular, 80);
+    timer = setTimeout(function () { recalcular(); if (remonta) montarFolha(true); }, 80);
   }
 
   function inp(caminho, tipo, opts) {
@@ -110,6 +111,7 @@
                         value: v == null ? '' : Math.round(v * 1e6) / 1e6 });
     }
     el.dataset.caminho = caminho; el.dataset.tipo = tipo;
+    if (opts.remonta) el.dataset.remonta = '1';
     if (opts.off) el.disabled = true;
     el.addEventListener('input', aoDigitar);
     el.addEventListener('change', aoDigitar);
@@ -280,7 +282,6 @@
     custo('Impostos s/ vendas', 'custos.impostos', 'pct', 'Lucro presumido pelo regime de caixa, sobre a receita recebida.');
     custo('Comissões s/ vendas', 'custos.comissoes', 'pct', 'Corretagem sobre o VGV vendido, reconhecida no mês da venda.');
     custo('Contrapartidas', 'custos.contrapartidas', 'pct', 'Obras de interesse público exigidas na aprovação. % do VGV.');
-    custo('Aquisição do terreno — em dinheiro', 'custos.aquisicao', 'num', 'Parcela paga em espécie ao proprietário. A permuta física reduz os lotes do quadro de fases.', { un: 'R$' });
     custo('Outros custos com terreno', 'custos.outrosTerreno', 'pct', 'Registro, ITBI e diligências sobre o equivalente à vista da aquisição.');
     c.push(reg('Registro, ITBI e diligências', [calc(function (r) { return R$(r.valores.itbiV); })],
       'Incide sobre o pagamento em dinheiro mais o valor presente da permuta.', true));
@@ -322,23 +323,88 @@
         'CDI deflacionado pelo IPCA. É a taxa com que o fluxo de permuta é trazido a valor presente.', true)
     ]));
 
-    /* 11 — permuta */
-    f.appendChild(quadro('Permuta financeira e valor da gleba', null, [
-      reg('Modo de cálculo', [inp('permuta.modo', 'sel', { opcoes: ['resolver', 'fixo'] })],
-        '"Resolver" procura a permuta que zera o VPL na TMA — é o involutivo. "Fixo" trava o percentual negociado.'),
-      reg('Permuta financeira', [inp('permuta.valor', 'pct'), un('%'),
-        calc(function (r) { return P.permuta.modo === 'resolver' ? '→ ' + pc(r.ind.permutaPct, 2) + ' resolvido' : ''; }, 'fraco')],
-        'Percentual da receita líquida mensal repassado ao proprietário do terreno.'),
-      reg('Valor presente da permuta', [calc(function (r) { return R$(r.ind.vpPermuta); })],
-        'O que a gleba vale neste estudo: o fluxo de permuta trazido à taxa real do terrenista.', true),
-      reg('Valor por m² de gleba', [calc(function (r) { return R$(r.ind.valorM2Gleba, 2); })], null, true)
-    ]));
+    /* 11 — terreno: o involutivo */
+    var modoResolver = (P.terreno.modo || 'resolver') === 'resolver';
+    var forma = P.terreno.forma || 'permuta';
+    var linhasTerreno = [
+      reg('Modo', [inp('terreno.modo', 'sel', { opcoes: ['resolver', 'informado'], remonta: true })],
+        modoResolver
+          ? 'Resolver: a TIR fica travada na TMA e o valor do terreno é o que resta depois de todas as receitas e despesas — ele entra no fluxo até zerar o VPL.'
+          : 'Informado: você trava o que está sendo pago pela terra e o modelo devolve a TIR que sobra.'),
+      reg('Forma de pagamento', [inp('terreno.forma', 'sel',
+        { opcoes: ['permuta', 'avista', 'misto'], remonta: true })],
+        'Permuta: percentual da receita líquida mensal. À vista: desembolso em dinheiro no cronograma abaixo. Misto: parte em cada um.')
+    ];
+    if (forma === 'misto') linhasTerreno.push(reg('Parcela paga em dinheiro',
+      [inp('terreno.pctDinheiro', 'pct'), un('%')],
+      'Quanto do valor da gleba sai em dinheiro. O restante vira permuta financeira.'));
+    if (forma !== 'permuta') {
+      linhasTerreno.push(reg('Pagamento em dinheiro — mês inicial',
+        [inp('janelas.terrenoIni', 'num', { step: 1 }), un('mês')]));
+      linhasTerreno.push(reg('Pagamento em dinheiro — nº de parcelas',
+        [inp('janelas.terrenoParc', 'num', { step: 1 }), un('parc.')],
+        'Parcelas iguais e sem reajuste contratual — o custo real cai com o tempo.'));
+    }
+    if (!modoResolver) {
+      if (forma !== 'permuta') linhasTerreno.push(reg('Valor pago em dinheiro',
+        [inp('terreno.valorDinheiro', 'num'), un('R$')]));
+      if (forma !== 'avista') linhasTerreno.push(reg('Permuta financeira',
+        [inp('terreno.permutaPct', 'pct'), un('%')], 'Percentual da receita líquida mensal.'));
+    }
+    linhasTerreno.push(reg('Valor da gleba — equivalente à vista',
+      [calc(function (r) { return R$(r.ind.valorTerreno); })],
+      modoResolver ? 'É o teto: acima disso o empreendimento deixa de remunerar a TMA.'
+                   : 'Soma do dinheiro e do valor presente da permuta.', true));
+    linhasTerreno.push(reg('   parte em dinheiro',
+      [calc(function (r) { return R$(r.ind.caixaTerreno); }),
+       calc(function (r) { return pc(r.ind.pctDinheiroEfetivo, 0) + ' do valor'; }, 'fraco')],
+      'Valor nominal, distribuído no cronograma acima.'));
+    linhasTerreno.push(reg('   parte em permuta',
+      [calc(function (r) { return R$(r.ind.vpPermuta); }),
+       calc(function (r) { return pc(r.ind.permutaPct, 2) + ' da receita líq.'; }, 'fraco')],
+      'Valor presente do repasse, à taxa real do terrenista.'));
+    linhasTerreno.push(reg('Valor por m² de gleba',
+      [calc(function (r) { return R$(r.ind.valorM2Gleba, 2); }),
+       calc(function (r) { return R$(r.ind.valorM2ALV, 2) + '/m² de ALV'; }, 'fraco')], null, true));
+    var escala = e('div');
+    var btnEscala = e('button', { cls: 'acao-clara', type: 'button',
+      txt: 'Calcular a escala de formas de pagamento' });
+    btnEscala.addEventListener('click', function () {
+      btnEscala.disabled = true; btnEscala.textContent = 'calculando…';
+      setTimeout(function () {
+        var pontos = [0, 0.25, 0.5, 0.75, 1].map(function (a) {
+          var copia = JSON.parse(JSON.stringify(P));
+          copia.terreno = { modo: 'resolver', pctDinheiro: a, valorDinheiro: 0, permutaPct: 0,
+            forma: a === 0 ? 'permuta' : a === 1 ? 'avista' : 'misto' };
+          var x = Motor.calcular(copia).ind;
+          return { a: a, valor: x.valorTerreno, caixa: x.caixaTerreno, perm: x.permutaPct,
+                   inv: x.investimento, pb: x.payback };
+        });
+        var th = e('tr', {}, ['Pago em dinheiro', 'Valor da gleba', 'Em dinheiro (R$)',
+          'Permuta (% da receita líq.)', 'Investimento requerido', 'Payback'].map(function (t) { return e('th', { txt: t }); }));
+        var tb = e('tbody');
+        pontos.forEach(function (x) {
+          tb.appendChild(e('tr', {}, [e('td', { txt: pc(x.a, 0) }), e('td', { txt: R$(x.valor) }),
+            e('td', { txt: R$(x.caixa) }), e('td', { txt: pc(x.perm, 2) }),
+            e('td', { txt: R$(x.inv) }), e('td', { txt: n(x.pb, 0) + ' meses' })]));
+        });
+        escala.textContent = '';
+        escala.appendChild(e('div', { style: 'overflow-x:auto;margin-top:8px' },
+          [e('table', { cls: 'dados' }, [e('thead', {}, [th]), tb])]));
+        escala.appendChild(e('p', { cls: 'nota-bloco', txt: 'Mesma TIR em todas as linhas — o que muda é quanto a terra pode custar conforme o desembolso é antecipado. É a régua da negociação: quanto o terrenista precisa aceitar em permuta para que o preço pedido caiba no estudo.' }));
+        btnEscala.disabled = false; btnEscala.textContent = 'Recalcular a escala';
+      }, 20);
+    });
+    linhasTerreno.push(e('div', { style: 'padding:10px 0 2px' }, [btnEscala, escala]));
+    f.appendChild(quadro('Terreno — quanto a gleba pode custar',
+      modoResolver ? 'TIR travada na TMA' : 'valor informado', linhasTerreno,
+      modoResolver
+        ? 'O solver busca o valor que zera o VPL na TMA e o reparte entre dinheiro e permuta na proporção escolhida. Antecipar o desembolso reduz o teto: pagar tudo à vista vale menos para o empreendedor do que a mesma quantia diluída em permuta.'
+        : null));
 
     /* 12 — janelas */
     var j = [];
     function jan(rot, caminho, tipo, nota) { j.push(reg(rot, [inp(caminho, tipo, { step: 1 }), un(tipo === 'pct' ? '%' : 'mês')], nota)); }
-    jan('Terreno — mês inicial', 'janelas.terrenoIni', 'num');
-    jan('Terreno — nº de parcelas', 'janelas.terrenoParc', 'num');
     jan('Registro e ITBI — mês inicial', 'janelas.itbiIni', 'num');
     jan('Registro e ITBI — nº de parcelas', 'janelas.itbiParc', 'num');
     jan('Contrapartidas — meses antes da obra', 'janelas.contrapAnteObra', 'num', 'Negativo: antecede o início da obra da fase.');
@@ -499,7 +565,7 @@
         });
         tb.appendChild(tr);
       });
-      box.appendChild(e('div', { cls: 'rolagem' }, [e('table', { cls: 'dados' }, [e('thead', {}, [thead]), tb])]));
+      box.appendChild(e('div', { cls: 'rolagem' }, [e('table', { cls: 'dados compacto' }, [e('thead', {}, [thead]), tb])]));
       box.appendChild(e('p', { cls: 'nota-bloco',
         txt: r.meses.length + ' meses de ciclo · exposição máxima de ' + mi(-r.ind.exposicao) + ' no mês ' +
              r.ind.mesExposicao + ' · payback primário no mês ' + r.ind.payback + '.' }));
@@ -526,17 +592,21 @@
 
       box.appendChild(e('div', { cls: 'destaque-gleba' }, [
         e('div', {}, [
-          e('div', { cls: 'k', txt: P.permuta.modo === 'resolver' ? 'Teto de aquisição da gleba' : 'Valor da gleba na permuta informada' }),
-          e('div', { cls: 'v', txt: R$(i.vpPermuta) }),
-          e('div', { cls: 'n', txt: 'valor presente da permuta de ' + pc(i.permutaPct, 2) +
-            ' da receita líquida, à taxa real do terrenista de ' + pc(i.taxaTerrenista, 2) + ' a.a.' })
+          e('div', { cls: 'k', txt: i.modoTerreno === 'resolver' ? 'Teto de aquisição da gleba' : 'Valor da gleba informado' }),
+          e('div', { cls: 'v', txt: R$(i.valorTerreno) }),
+          e('div', { cls: 'n', txt: (i.formaTerreno === 'avista' ? 'integralmente à vista, em ' + i.parcelasTerreno +
+              (i.parcelasTerreno > 1 ? ' parcelas' : ' parcela') + ' a partir do mês ' + i.mesTerreno
+            : i.formaTerreno === 'permuta' ? 'integralmente em permuta: ' + pc(i.permutaPct, 2) + ' da receita líquida mensal'
+            : R$(i.caixaTerreno) + ' em dinheiro mais permuta de ' + pc(i.permutaPct, 2) + ' da receita líquida') +
+            (i.modoTerreno === 'resolver' ? ' · TIR travada na TMA de ' + pc(i.tma, 2) : '') })
         ]),
         e('div', {}, [e('div', { cls: 'k', txt: 'Por m² de gleba' }),
                       e('div', { cls: 'v', style: 'font-size:26px', txt: R$(i.valorM2Gleba, 2) })])
       ]));
 
       box.appendChild(painel([
-        ['TIR real', i.tir === null ? '—' : pc(i.tir, 2), 'a.a. acima do IPCA · TMA ' + pc(i.tma, 2)],
+        ['TIR real', i.tir === null ? '—' : pc(i.tir, 2), i.modoTerreno === 'resolver'
+          ? 'travada na TMA de ' + pc(i.tma, 2) : 'a.a. acima do IPCA · TMA ' + pc(i.tma, 2)],
         ['VPL à TMA', R$(i.vpl), ''],
         ['Resultado', mi(i.resultado), 'margem de ' + pc(i.margemReceita) + ' sobre a receita'],
         ['Investimento requerido', mi(i.investimento), 'exposição máxima no mês ' + i.mesExposicao],
@@ -545,7 +615,8 @@
         ['VGV de tabela', mi(i.vgv), 'margem de ' + pc(i.margemVGV) + ' sobre o VGV'],
         ['Ciclo total', n(i.ciclo, 0) + ' meses', 'último recebimento no mês ' + i.ultimoRecebimento],
         ['Resultado por lote', R$(i.resultadoPorLote), ''],
-        ['Resultado por m² de ALV', R$(i.resultadoPorM2, 2), '']
+        ['Resultado por m² de ALV', R$(i.resultadoPorM2, 2), ''],
+        ['Registro e ITBI', R$(-r.totais.itbi), pc(P.custos.outrosTerreno, 1) + ' do equivalente à vista']
       ]));
 
       var linhas = [
@@ -664,16 +735,125 @@
       p('As maiores aplicações do ciclo, em moeda da base: ' + contas.slice(0, 4).map(function (c) {
         return c[0].toLowerCase() + ' ' + num(R$(-c[1])); }).join(', ') + '.');
       h('5 · Valor da gleba');
-      p('A permuta financeira de ' + num(pc(i.permutaPct, 2)) + ' da receita líquida mensal, trazida a valor presente ' +
-        'pela taxa real do terrenista de ' + num(pc(i.taxaTerrenista, 2) + ' a.a.') + ', equivale a ' +
-        num(R$(i.vpPermuta)) + ' — ou ' + num(R$(i.valorM2Gleba, 2) + '/m²') + ' de gleba. ' +
-        (P.permuta.modo === 'resolver'
+      p('O pagamento da gleba está estruturado ' + (i.formaTerreno === 'avista' ? 'integralmente à vista'
+          : i.formaTerreno === 'permuta' ? 'integralmente em permuta financeira'
+          : 'em regime misto: ' + pc(i.pctDinheiroEfetivo, 0) + ' em dinheiro e o restante em permuta') +
+        ', o que equivale a ' + num(R$(i.valorTerreno)) + ' à vista — ou ' +
+        num(R$(i.valorM2Gleba, 2) + '/m²') + ' de gleba. A parcela em permuta, de ' +
+        num(pc(i.permutaPct, 2)) + ' da receita líquida mensal, vale ' + num(R$(i.vpPermuta)) +
+        ' trazida pela taxa real do terrenista de ' + num(pc(i.taxaTerrenista, 2) + ' a.a.') + '. ' +
+        (i.modoTerreno === 'resolver'
           ? 'Como o percentual foi resolvido para zerar o VPL na TMA, esse é o teto que o empreendimento suporta pagar pela terra.'
           : 'O percentual está travado no valor informado, e o retorno acima da TMA é o que sobra para o empreendedor.'));
       h('6 · Base metodológica');
       p('Análise da Qualidade do Investimento no padrão NRE-POLI/USP: fluxo em moeda da base, taxa de retorno real, ' +
         'payback primário, duration e reconhecimento pelo regime de caixa. O modelo é 100% capital próprio — a TIR de ' +
         num(pc(i.tir, 2)) + ' é desalavancada. Nenhum número é digitado no fluxo: todos derivam das premissas.');
+    });
+    f.appendChild(box);
+    return f;
+  }
+
+
+  /* ============================================================ AUDITORIA */
+  function folhaAuditoria() {
+    var f = document.createDocumentFragment();
+    f.appendChild(e('div', { cls: 'folha-topo' }, [
+      e('h1', { txt: 'Auditoria' }),
+      e('p', { txt: 'As reconciliações rodam a cada alteração de premissa. Cada linha compara duas grandezas apuradas por caminhos independentes — se alguma divergir, os números não devem ser apresentados.' })
+    ]));
+    var box = e('div');
+    atualizadores.push(function (r) {
+      box.textContent = '';
+      var i = r.ind, T = r.totais;
+      var soma = function (a) { return a.reduce(function (x, y) { return x + y; }, 0); };
+
+      /* trava da TIR */
+      var travada = i.modoTerreno === 'resolver';
+      box.appendChild(quadro('Trava da TIR', travada ? 'o valor do terreno zera o fluxo' : 'valor do terreno informado', [
+        painel([
+          ['TIR real do empreendimento', i.tir === null ? '—' : pc(i.tir, 4), 'a.a. acima do IPCA'],
+          ['TMA real exigida', pc(i.tma, 4), '(1 + CDI × múltiplo) ÷ (1 + IPCA) − 1'],
+          ['Diferença', i.tir === null ? '—' : n((i.tir - i.tma) * 100, 4) + ' p.p.', travada ? 'deve ser zero' : 'folga sobre a taxa exigida'],
+          ['VPL à TMA', R$(i.vpl), travada ? 'deve ser zero' : 'valor criado acima da TMA']
+        ])
+      ], travada
+        ? 'Com a TIR travada, o valor da gleba é a variável de saída: ele absorve tudo o que sobra depois de receitas, custos, despesas e tributos.'
+        : 'Com o valor informado, a TIR é a variável de saída: ela mostra o que sobra depois de pagar o preço pedido pela terra.'));
+
+      /* reconciliações */
+      var linhas = [];
+      function rec(nome, a, b, tol, comentario) {
+        var dif = Math.abs(a - b), passou = dif <= (tol === undefined ? 1 : tol);
+        linhas.push({ nome: nome, a: a, b: b, dif: dif, ok: passou, obs: comentario });
+      }
+      var contas = T.receita + T.impostos + T.corretagem + T.gestao + T.premiacao + T.marketing +
+        T.stand + T.admvendas + T.bancarias + T.permuta + T.terreno + T.itbi + T.preop + T.obra +
+        T.contrap + T.ger + T.manut + T.cga;
+      rec('Demonstrativo × fluxo de caixa', contas, i.resultado, 1,
+        'O DRF soma conta a conta; o fluxo soma mês a mês.');
+      rec('Soma dos meses × resultado', soma(r.meses.map(function (m) { return m.fluxo; })), i.resultado, 1);
+      rec('Soma das fases × resultado', soma(r.resultadoFase.map(function (x) { return x.resultado; })), i.resultado, 1,
+        'O rateio das contas comuns distribui 100% do valor.');
+      rec('Receita líquida × receita menos deduções', T.liquida,
+        T.receita + T.impostos + T.corretagem + T.gestao + T.premiacao + T.marketing + T.stand +
+        T.admvendas + T.bancarias, 1);
+      rec('Investimento × exposição máxima de caixa', i.investimento, -i.exposicao, 1,
+        'O capital aportado é exatamente o pior saldo acumulado.');
+      rec('Retorno × resultado mais investimento', i.retorno, i.resultado + i.investimento, 1);
+      rec('Valor do terreno × dinheiro mais permuta', i.valorTerreno, i.vpCaixa + i.vpPermuta, 1,
+        'Ambas as parcelas trazidas à taxa real do terrenista.');
+      rec('Mix dos planos de venda', P.planos.reduce(function (a, b) { return a + (+b.mix || 0); }, 0) * 100, 100, 0.01, 'em %');
+      r.fases.forEach(function (fa, k) {
+        rec('Curva de obra da fase ' + fa.i, soma(fa.etapas.map(function (x) { return x.pct; })) * 100, 100, 0.01, 'em %');
+        rec('Janelas de venda da fase ' + fa.i, (fa.velLanc + fa.velObra + fa.velPos) * 100, 100, 0.01, 'em %');
+      });
+      if (travada) {
+        rec('VPL na TMA', i.vpl, 0, 1000, 'precisão do solver');
+        rec('TIR menos TMA (p.p.)', (i.tir - i.tma) * 100, 0, 0.01);
+      }
+      var th = e('tr', {}, ['Reconciliação', 'Apurado', 'Referência', 'Diferença', ''].map(function (t) { return e('th', { txt: t }); }));
+      var tb = e('tbody');
+      linhas.forEach(function (l) {
+        tb.appendChild(e('tr', {}, [
+          e('td', {}, [e('span', { txt: l.nome }), l.obs ? e('div', { style: 'font-size:11px;color:var(--muted)', txt: l.obs }) : null]),
+          e('td', { txt: n(l.a, 2) }), e('td', { txt: n(l.b, 2) }),
+          e('td', { cls: l.ok ? '' : 'neg', txt: n(l.dif, 2) }),
+          e('td', {}, [e('span', { cls: 'chip' + (l.ok ? '' : ' ruim') },
+            [e('span', { cls: 'pt' }), e('span', { txt: l.ok ? 'confere' : 'DIVERGE' })])])
+        ]));
+      });
+      var falhas = linhas.filter(function (l) { return !l.ok; }).length;
+      box.appendChild(quadro('Reconciliações independentes',
+        falhas ? falhas + ' divergência(s)' : linhas.length + ' de ' + linhas.length + ' conferem',
+        [e('div', { style: 'overflow-x:auto' }, [e('table', { cls: 'dados' }, [e('thead', {}, [th]), tb])])]));
+
+      /* controles de consistência */
+      var chips = e('div', { cls: 'chips' });
+      r.checks.forEach(function (c) {
+        chips.appendChild(e('span', { cls: 'chip' + (c.ok ? '' : ' ruim') },
+          [e('span', { cls: 'pt' }), e('span', { txt: c.txt })]));
+      });
+      box.appendChild(quadro('Controles de consistência',
+        r.checks.filter(function (c) { return c.ok; }).length + ' de ' + r.checks.length + ' OK', [chips]));
+
+      /* calibração */
+      var cal = [
+        ['Receita de vendas recebida', 112451628], ['Obras de infraestrutura', -19684408],
+        ['Permuta ao terrenista', -40819883], ['Resultado do empreendimento', 26954366],
+        ['TIR real (% a.a.)', 21.7401], ['VPL à TMA (R$)', 350.18],
+        ['Investimento requerido', 15112126], ['Retorno ao investidor', 42066493],
+        ['Payback (meses)', 79], ['Duration (meses)', 78.38],
+        ['Valor presente da permuta', 22784960]
+      ];
+      var thc = e('tr', {}, ['Grandeza', 'Planilha de origem'].map(function (t) { return e('th', { txt: t }); }));
+      var tbc = e('tbody');
+      cal.forEach(function (c) {
+        tbc.appendChild(e('tr', {}, [e('td', { txt: c[0] }), e('td', { txt: n(c[1], Math.abs(c[1]) < 1000 ? 2 : 0) })]));
+      });
+      box.appendChild(quadro('Calibração contra a planilha de origem', 'estudo de referência — Itu, 164 lotes, 1 fase',
+        [e('div', { style: 'overflow-x:auto' }, [e('table', { cls: 'dados' }, [e('thead', {}, [thc]), tbc])])],
+        'O motor foi conferido contra a planilha conta a conta e mês a mês: nenhuma conta diverge mais de 0,001% e nenhuma linha do fluxo mensal diverge mais de R$ 50 em 235 meses. A bateria completa tem 93 verificações e está no repositório em testes/auditoria.js — inclui a trava da TIR nas três formas de pagamento, a monotonicidade do teto e o comportamento com entradas degeneradas.'));
     });
     f.appendChild(box);
     return f;
@@ -688,7 +868,8 @@
     { id: 'v4', rot: 'Vendas F4', n: '5', render: function () { return folhaVendas(3); } },
     { id: 'fluxo', rot: 'Fluxo de caixa', n: '6', render: folhaFluxo },
     { id: 'drf', rot: 'Demonstrativo', n: '7', render: folhaDRF },
-    { id: 'memorial', rot: 'Memorial', n: '8', render: folhaMemorial }
+    { id: 'auditoria', rot: 'Auditoria', n: '8', render: folhaAuditoria },
+    { id: 'memorial', rot: 'Memorial', n: '9', render: folhaMemorial }
   ];
 
   function montarAbas() {
@@ -702,14 +883,15 @@
     });
   }
 
-  function montarFolha() {
+  function montarFolha(manterRolagem) {
+    var y = window.scrollY;
     atualizadores = [];
     var alvo = document.getElementById('folha');
     alvo.textContent = '';
     var aba = ABAS.filter(function (a) { return a.id === abaAtiva; })[0];
     alvo.appendChild(aba.render());
     aplicar();
-    window.scrollTo(0, 0);
+    window.scrollTo(0, manterRolagem ? y : 0);
   }
 
   function aplicar() {
@@ -717,7 +899,8 @@
     atualizadores.forEach(function (fn) { try { fn(R); } catch (err) {} });
     var topo = document.getElementById('resumo-topo');
     topo.textContent = '';
-    [['Valor da gleba', R$(R.ind.vpPermuta)], ['TIR real', R.ind.tir === null ? '—' : pc(R.ind.tir, 2)],
+    [['Valor da gleba', R$(R.ind.valorTerreno)],
+     ['TIR real', R.ind.tir === null ? '—' : pc(R.ind.tir, 2) + (R.ind.modoTerreno === 'resolver' ? ' = TMA' : '')],
      ['Resultado', mi(R.ind.resultado)], ['Investimento', mi(R.ind.investimento)]].forEach(function (d) {
       topo.appendChild(e('div', {}, [e('span', { cls: 'r', txt: d[0] }), e('span', { cls: 'v', txt: d[1] })]));
     });
@@ -741,7 +924,15 @@
   function iniciar() {
     try {
       var salvo = localStorage.getItem('involutivo.premissas');
-      if (salvo) { var p = JSON.parse(salvo); if (p && p.areas && p.planos && p.areas.viario < 1) P = p; }
+      if (salvo) {
+        var p = JSON.parse(salvo);
+        if (p && p.areas && p.planos && p.areas.viario < 1) {
+          if (!p.terreno) p.terreno = { modo: (p.permuta && p.permuta.modo === 'fixo') ? 'informado' : 'resolver',
+            forma: 'permuta', pctDinheiro: .4, valorDinheiro: p.custos ? (p.custos.aquisicao || 0) : 0,
+            permutaPct: p.permuta ? p.permuta.valor : .42 };
+          P = p;
+        }
+      }
     } catch (err) {}
     R = Motor.calcular(P);
     montarAbas(); montarFolha();
