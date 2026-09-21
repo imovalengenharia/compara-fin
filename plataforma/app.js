@@ -528,8 +528,12 @@
         'Cada fase tem obra, lançamento e curva de vendas próprios. Só as fases habilitadas aparecem.')
     ]));
 
+    /* O residencial vende por curva: quem manda é o rateio do quadro de planos,
+       e não há outra forma a escolher — por isso o campo aparece como valor
+       fixo, e não como lista. O comercial é negociado lote a lote, então
+       escolhe entre o preço de tabela à vista e um plano específico. */
     function opcoesPagamento() {
-      var o = [['mix', 'Mix dos planos'], ['avista', 'À vista (tabela)']];
+      var o = [['avista', 'À vista (tabela)']];
       P.planos.forEach(function (pl, i) {
         var q = Math.round(+pl.n || 0);
         if (q < 1) return;
@@ -568,7 +572,9 @@
       { rot: 'Preço do lote', cels: idxP.map(function (i) {
           return calc(function (r) { return r.prog.prods[i].precoLote ? n(r.prog.prods[i].precoLote, 0) : '—'; }); }) },
       { rot: 'Forma de pagamento', cels: idxP.map(function (i) {
-          return inp('produtos.' + i + '.pagamento', 'sel', { opcoes: opcoesPagamento() }); }) },
+          return P.produtos[i].tipo === 'comercial'
+            ? inp('produtos.' + i + '.pagamento', 'sel', { opcoes: opcoesPagamento() })
+            : calc(function () { return 'Plano de vendas'; }, 'fraco'); }) },
       { rot: 'Mês da venda (comercial)', cels: idxP.map(function (i) {
           return P.produtos[i].tipo === 'comercial'
             ? inp('produtos.' + i + '.momento', 'sel', { opcoes: ['Início', 'Intermediário', 'Fim'] })
@@ -585,7 +591,7 @@
               ? p.meses.map(function (m) { return 'Fase ' + m.fase + ': mês ' + m.mes; }).join(' · ')
               : '—';
           }, 'fraco'); }) }
-    ], 'Residencial vende ao longo das três janelas da fase; comercial é negociado em um único mês — Início é o lançamento da fase, Intermediário a entrega da obra e Fim o último mês de vendas. A forma de pagamento é livre para os dois: "mix dos planos" distribui as unidades conforme o quadro acima; "à vista, sem desconto" recebe tudo no ato pelo preço de tabela — é o usual do lote comercial; ou aponte um plano específico, e todas as unidades do produto vendem naquele plano.')]));
+    ], 'Residencial vende ao longo das três janelas da fase, rateado entre os planos conforme o quadro acima. Comercial é negociado em um único mês — Início é o lançamento da fase, Intermediário a entrega da obra e Fim o último mês de vendas — à vista pelo preço de tabela ou por um plano específico.')]));
 
     /* 4 — quadro de fases */
     var fasesAtivas = [];
@@ -1246,7 +1252,17 @@
     });
   }
 
+  /* Trocar o tipo do produto troca o leque de formas de pagamento; o valor
+     guardado acompanha, para não sobrar apontando para uma opção que sumiu. */
+  function normalizarPagamentos() {
+    (P.produtos || []).forEach(function (p) {
+      if (p.tipo === 'comercial') { if (p.pagamento === 'mix') p.pagamento = 'avista'; }
+      else p.pagamento = 'mix';
+    });
+  }
+
   function recalcular() {
+    normalizarPagamentos();
     try { R = Motor.calcular(P); } catch (err) { console.error(err); return; }
     aplicar();
     try { localStorage.setItem('involutivo.premissas', JSON.stringify(P)); } catch (err) {}
@@ -1304,6 +1320,7 @@
         }
       }
     } catch (err) {}
+    normalizarPagamentos();
     R = Motor.calcular(P);
     montarAbas(); montarFolha();
     var btnTema = document.getElementById('btn-tema');
