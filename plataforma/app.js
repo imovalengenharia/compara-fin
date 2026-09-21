@@ -756,6 +756,8 @@
 
       var linhas = [
         ['Receita de vendas recebida', T.receita, 'soma'],
+        ['residencial', T.receitaRes, 'ind'],
+        ['comercial', T.receitaCom, 'ind'],
         ['(−) Impostos sobre a receita', T.impostos, 'ind'],
         ['(−) Corretagem', T.corretagem, 'ind'],
         ['(−) Gestão comercial', T.gestao, 'ind'],
@@ -1087,6 +1089,19 @@
     } catch (err) {}
     R = Motor.calcular(P);
     montarAbas(); montarFolha();
+    var btnTema = document.getElementById('btn-tema');
+    function aplicarTema(t) {
+      if (t === 'claro') document.documentElement.setAttribute('data-tema', 'claro');
+      else document.documentElement.removeAttribute('data-tema');
+      btnTema.textContent = t === 'claro' ? 'Tema escuro' : 'Tema claro';
+      try { localStorage.setItem('involutivo.tema', t); } catch (err) {}
+    }
+    var temaSalvo = 'escuro';
+    try { temaSalvo = localStorage.getItem('involutivo.tema') || 'escuro'; } catch (err) {}
+    aplicarTema(temaSalvo);
+    btnTema.addEventListener('click', function () {
+      aplicarTema(document.documentElement.getAttribute('data-tema') === 'claro' ? 'escuro' : 'claro');
+    });
     document.getElementById('btn-restaurar').addEventListener('click', function () {
       P = premissasPadrao(); recalcular(); montarFolha();
     });

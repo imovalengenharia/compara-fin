@@ -74,6 +74,7 @@ var fixo = Motor.calcular(ITU(function (P) {
 }));
 var T = fixo.totais, rel = { rel: 0.0005 };
 [['Receita de vendas recebida', T.receita, 112451627.65],
+
  ['Impostos sobre a receita', T.impostos, -7567994.54],
  ['Corretagem', T.corretagem, -3821335.01],
  ['Gestão comercial', T.gestao, -424592.78],
@@ -93,6 +94,12 @@ var T = fixo.totais, rel = { rel: 0.0005 };
  ['CGA', T.cga, -2469021.90],
  ['Resultado do empreendimento', fixo.ind.resultado, 26954366.38]
 ].forEach(function (l) { conferir(l[0], l[1], l[2], rel); });
+/* A receita comercial é conferida pelos primeiros princípios: cada lote à vista,
+   a preço de tabela corrigido até o mês da venda e deflacionado pelo IPCA. */
+var fr = function (m) { return Math.pow(1.05 / 1.035, m / 12); };
+var comercialEsperada = 1000000 * fr(43) + 425000 * fr(19) + 425000 * fr(43) + 212500 * fr(54);
+conferir('Receita comercial (lotes à vista corrigidos)', T.receitaCom, comercialEsperada, { rel: 0.0005 });
+conferir('Receita residencial (total menos comercial)', T.receitaRes, 112451627.65 - T.receitaCom, { rel: 0.0005 });
 conferir('TIR real (% a.a.)', fixo.ind.tir * 100, 21.7401, { abs: 0.002 });
 conferir('TMA real (% a.a.)', fixo.ind.tma * 100, 21.7391, { abs: 0.002 });
 conferir('VPL à TMA (R$)', fixo.ind.vpl, 350.18, { abs: 30 });
@@ -115,6 +122,7 @@ function coerencia(r, etiqueta) {
   var somaContas = T.receita + T.impostos + T.corretagem + T.gestao + T.premiacao + T.marketing +
     T.stand + T.admvendas + T.bancarias + T.permuta + T.terreno + T.itbi + T.preop + T.obra +
     T.contrap + T.ger + T.manut + T.cga;
+  somaContas = somaContas - T.receita + T.receitaRes + T.receitaCom;
   conferir(etiqueta + ' · demonstrativo concilia com o fluxo', somaContas, i.resultado, { abs: 1 });
   conferir(etiqueta + ' · soma dos meses = resultado', soma(r.meses.map(function (m) { return m.fluxo; })),
     i.resultado, { abs: 1 });
@@ -126,6 +134,8 @@ function coerencia(r, etiqueta) {
     i.vpCaixa + i.vpPermuta, { abs: 1 });
   conferir(etiqueta + ' · ITBI = 2% do equivalente à vista', -T.itbi,
     0.02 * (i.caixaTerreno + i.vpPermuta) * Math.pow(1.035, -1 / 12), { rel: 0.001 });
+  conferir(etiqueta + ' · receita = residencial + comercial', T.receita,
+    T.receitaRes + T.receitaCom, { abs: 1 });
   conferir(etiqueta + ' · receita líquida = receita − deduções', T.liquida,
     T.receita + T.impostos + T.corretagem + T.gestao + T.premiacao + T.marketing + T.stand +
     T.admvendas + T.bancarias, { abs: 1 });

@@ -20,7 +20,8 @@
     ['obra',      'Obras de infraestrutura'],
     ['manut',     'Manutenção pós-obras'],
     ['ger',       'Gerenciamento de obras'],
-    ['receita',   'Receita de vendas'],
+    ['receitaRes','Receita de vendas — residencial'],
+    ['receitaCom','Receita de vendas — comercial'],
     ['impostos',  'Impostos sobre a receita'],
     ['marketing', 'Marketing'],
     ['stand',     'Stand de vendas'],
@@ -191,7 +192,7 @@
   /* ----------------------------------------------------------- receitas */
   function receitas(P, prog, cron) {
     var ipca = num(P.indices.ipca), N = HORIZONTE;
-    var rec = z(), vgvVendido = z(), entradas = z(), parcelas = z();
+    var rec = z(), recRes = z(), recCom = z(), vgvVendido = z(), entradas = z(), parcelas = z();
     var recFase = [z(), z(), z(), z()];
     var planos = P.planos.map(function (pl) {
       var n = Math.max(0, Math.round(num(pl.n)));
@@ -202,8 +203,9 @@
     });
     function def(m) { return Math.pow(1 + ipca, -m / 12); }
 
-    function vender(qtd, precoLote, m, fase, soVista) {
+    function vender(qtd, precoLote, m, fase, soVista, comercial) {
       if (qtd <= 0 || m < 0 || m >= N) return;
+      var porTipo = comercial ? recCom : recRes;
       for (var k = 0; k < planos.length; k++) {
         var pl = planos[k];
         var mix = soVista ? (k === 0 ? 1 : 0) : pl.mix;
@@ -213,14 +215,14 @@
         var valor = qtd * mix * precoLote * (1 - desconto) * corr;
         vgvVendido[m] += valor * def(m);
         var ent = valor * pl.entrada;
-        rec[m] += ent * def(m); entradas[m] += ent * def(m);
+        rec[m] += ent * def(m); porTipo[m] += ent * def(m); entradas[m] += ent * def(m);
         if (fase >= 0) recFase[fase][m] += ent * def(m);
         var fin = valor * (1 - pl.entrada);
         if (fin <= 0 || pl.n <= 1) continue;
         var pmt = fin * pl.fator;                      // parcela FIXA em moeda nominal
         for (var t = 1; t <= pl.n && m + t < N; t++) {
           var v = pmt * def(m + t);
-          rec[m + t] += v; parcelas[m + t] += v;
+          rec[m + t] += v; porTipo[m + t] += v; parcelas[m + t] += v;
           if (fase >= 0) recFase[fase][m + t] += v;
         }
       }
@@ -228,12 +230,14 @@
     for (var f = 0; f < cron.fases.length; f++) {
       for (var p = 0; p < prog.prods.length; p++) {
         var pr = prog.prods[p], serie = cron.vendas[f][p], avista = pr.pagamento === 'avista';
-        for (var m = 0; m < N; m++) if (serie[m] > 0) vender(serie[m], pr.precoLote, m, f, avista);
+        for (var m = 0; m < N; m++) if (serie[m] > 0)
+          vender(serie[m], pr.precoLote, m, f, avista, pr.tipo === 'comercial');
       }
     }
     var ultimo = 0;
     for (var q = 0; q < N; q++) if (rec[q] > 0.5) ultimo = q;
-    return { rec: rec, vgvVendido: vgvVendido, entradas: entradas, parcelas: parcelas,
+    return { rec: rec, recRes: recRes, recCom: recCom, vgvVendido: vgvVendido,
+             entradas: entradas, parcelas: parcelas,
              recFase: recFase, ultimoRecebimento: ultimo, planos: planos };
   }
 
@@ -310,7 +314,8 @@
     espalhar(col.cga, cgaV, 0, R.ultimoRecebimento + 1, fIPCA);
 
     for (var m = 0; m < N; m++) {
-      col.receita[m] = R.rec[m];
+      col.receitaRes[m] = R.recRes[m];
+      col.receitaCom[m] = R.recCom[m];
       col.impostos[m] = -num(C.impostos) * R.rec[m];
       col.corretagem[m] = -num(C.comissoes) * R.vgvVendido[m];
       col.gestao[m] = -num(C.gestaoComercial) * R.vgvVendido[m];
@@ -324,7 +329,7 @@
 
     var liquida = z(), fluxo = z(), acum = z(), a = 0;
     for (var t = 0; t < N; t++) {
-      liquida[t] = col.receita[t] + col.impostos[t] + col.marketing[t] + col.stand[t] +
+      liquida[t] = col.receitaRes[t] + col.receitaCom[t] + col.impostos[t] + col.marketing[t] + col.stand[t] +
                    col.corretagem[t] + col.gestao[t] + col.premiacao[t] + col.admvendas[t] +
                    col.bancarias[t];
       col.permuta[t] = -permPct * Math.max(0, liquida[t]);
@@ -476,7 +481,7 @@
 
     var expo = Math.min.apply(null, acum), mExpo = acum.indexOf(expo);
     var pb = null; for (var m = 1; m < N; m++) if (acum[m] >= 0 && pb === null) pb = m;
-    var resultado = soma(fluxo), receitaTot = soma(M.col.receita);
+    var resultado = soma(fluxo), receitaTot = soma(M.col.receitaRes) + soma(M.col.receitaCom);
     var tirReal = tir(INV.AW.map(function (v) { return -v; }));
     var investimento = INV.aporte;            // capital próprio que sustenta o caixa até a virada
     var retorno = INV.retorno;                // tudo que volta ao investidor no ciclo
@@ -494,11 +499,13 @@
     for (var i = 0; i <= ciclo; i++) {
       var linha = { mes: i };
       COLUNAS.forEach(function (cc) { linha[cc[0]] = M.col[cc[0]][i]; });
+      linha.receita = M.col.receitaRes[i] + M.col.receitaCom[i];
       linha.liquida = M.liquida[i]; linha.fluxo = fluxo[i]; linha.acum = acum[i];
       meses.push(linha);
     }
     var totais = { liquida: soma(M.liquida), fluxo: resultado, acum: acum[ciclo] };
     COLUNAS.forEach(function (cc) { totais[cc[0]] = soma(M.col[cc[0]]); });
+    totais.receita = totais.receitaRes + totais.receitaCom;
 
     var alvFolga = areas.alvDisponivel - prog.alv;
     var checks = [
