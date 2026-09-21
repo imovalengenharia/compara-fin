@@ -10,9 +10,11 @@
   function premissasPadrao() {
     return {
       identificacao: { nome: 'Gleba Itu — lotes', municipio: 'Itu', uf: 'SP', data: '23/09/2025' },
+      /* as três destinações começam no percentual usual de cada modelo — são
+         sugestões da plataforma, escritas em letra clara até o avaliador
+         informar as suas. APP e faixa vêm do levantamento, não do modelo. */
       areas: { tipo: 'aberto', gleba: 160084,
-               aberto:     { circulacao: 0.24022388246170762, verdeLazer: 0.10466942355263506,
-                             institucional: 0.025 },
+               aberto:     { circulacao: 0.20, verdeLazer: 0.10, institucional: 0.05 },
                condominio: { circulacao: 0.15, verdeLazer: 0.10, institucional: 0.05 },
                app: 0.1288136228480048, faixa: 14408, restricao: 0 },
       prazos: { preOp: 18, nFases: 1 },
@@ -54,7 +56,7 @@
   }
   var R$ = function (v, d) { return 'R$ ' + n(v, d === undefined ? 0 : d); };
   var mi = function (v) { return 'R$ ' + n(v / 1e6, 1) + ' M'; };
-  var pc = function (v, d) { return n(v * 100, d === undefined ? 1 : d) + '%'; };
+  var pc = function (v, d) { return n(v * 100, d === undefined ? 1 : d) + '\u00A0%'; };
   var mes = function (v) { return v === null || v === undefined ? '—' : 'mês ' + n(v, 0); };
 
   /* Campos numéricos seguem o padrão brasileiro: ponto separa o milhar,
@@ -96,6 +98,15 @@
     if (v === null || v === undefined || !isFinite(v)) return '';
     return fmtCampo(String(Math.round(v * 1e6) / 1e6).replace('.', ','), inteiro);
   }
+  /* Um campo que ainda mostra o número sugerido pela plataforma é escrito em
+     letra mais clara. Assim que o avaliador digita um valor diferente, ele
+     passa a ser dado dele e ganha a cor cheia. */
+  function marcarSugerido(el, valor) {
+    if (el.dataset.sugerido === undefined) return;
+    var igual = Math.abs((+valor || 0) - (+el.dataset.sugerido || 0)) < 1e-9;
+    el.classList.toggle('sugerido', igual);
+  }
+
   /* Reescreve o campo já formatado mantendo o cursor depois dos mesmos dígitos */
   function reformatar(el) {
     var antes = el.value, pos = el.selectionStart;
@@ -279,6 +290,7 @@
     }
     var excessoAntes = excessoALV();
     guardar(c, v);
+    marcarSugerido(el, v);
     travarALV(el, c);
     /* a gleba mudou e o programa não cabe mais: a edição vale, o aviso explica */
     if (excessoALV() > excessoAntes + 0.5) {
@@ -312,6 +324,10 @@
                         autocomplete: 'off', spellcheck: 'false',
                         value: porNum(v, inteiro) });
       if (inteiro) el.dataset.inteiro = '1';
+      if (opts.sugerido !== undefined && opts.sugerido !== null) {
+        el.dataset.sugerido = opts.sugerido;
+        marcarSugerido(el, pegar(caminho));
+      }
       if (opts.min !== undefined) el.dataset.min = opts.min;
       if (opts.max !== undefined) el.dataset.max = opts.max;
       /* a tecla "." vira vírgula: dentro do campo o ponto é sempre milhar */
@@ -336,16 +352,33 @@
     if (opts.off) el.disabled = true;
     el.addEventListener('input', aoDigitar);
     el.addEventListener('change', aoDigitar);
-    if (tipo !== 'pct') return el;
-    /* percentual carrega o sinal dentro do próprio campo */
-    var caixa = e('span', { cls: 'campo pct' }, [el, e('span', { cls: 'sufixo', txt: '%' })]);
+    return afixar(el, tipo === 'pct' ? '%' : opts.un);
+  }
+
+  /* Símbolos curtos moram dentro do campo: % e m² à direita, na folga que
+     todos os campos numéricos reservam, e R$ à esquerda, onde não disputa
+     espaço com o número. Unidades que são palavras ("meses", "a.a.") ficam
+     na coluna de unidade. */
+  var AFIXOS = { '%': 'sufixo', 'm²': 'sufixo', 'R$': 'prefixo' };
+  function afixar(el, un) {
+    var lado = AFIXOS[un];
+    if (!lado || !el.classList.contains('num')) return el;
+    if (lado === 'prefixo') el.classList.add('com-prefixo');
+    var caixa = e('span', { cls: 'campo' }, [el, e('span', { cls: lado, txt: un })]);
+    caixa.dataset.un = un;
     return caixa;
   }
 
   /* valor calculado: registra-se para ser atualizado a cada recálculo */
   function calc(fn, cls) {
     var el = e('span', { cls: 'calc' + (cls ? ' ' + cls : '') });
-    atualizadores.push(function (r) { el.textContent = fn(r); });
+    atualizadores.push(function (r) {
+      var t = fn(r);
+      el.textContent = t;
+      /* só o que é número guarda a folga do afixo à direita; texto usa a
+         célula inteira, senão quebra linha à toa */
+      el.classList.toggle('txt', !/^[-\dR—]/.test(String(t).trim()));
+    });
     return el;
   }
   function un(t) { return e('span', { cls: 'un', txt: t || '' }); }
@@ -354,10 +387,16 @@
   function reg(rot, celulas, nota, forte) {
     celulas = (celulas || []).filter(Boolean);
     var temUn = celulas[1] && celulas[1].className === 'un';
-    if (temUn && celulas[0] && celulas[0].classList && celulas[0].classList.contains('pct')) {
-      var u = celulas[1].textContent;
-      if (u === '%') { celulas.splice(1, 1); temUn = false; }
-      else if (u.slice(0, 2) === '% ') celulas[1].textContent = u.slice(2);
+    if (temUn && celulas[0]) {
+      /* o campo ainda não tem afixo: se a unidade couber lá dentro, vai */
+      if (celulas[0].tagName === 'INPUT' && AFIXOS[celulas[1].textContent]) {
+        celulas[0] = afixar(celulas[0], celulas[1].textContent);
+      }
+      var dentro = celulas[0].dataset && celulas[0].dataset.un, u = celulas[1].textContent;
+      if (dentro === u) { celulas.splice(1, 1); temUn = false; }
+      else if (dentro && u.slice(0, dentro.length + 1) === dentro + ' ') {
+        celulas[1].textContent = u.slice(dentro.length + 1);
+      }
     }
     var linha = e('div', { cls: 'reg' + (forte ? ' forte' : '') },
       [e('div', { cls: 'rot', txt: rot })]);
@@ -431,7 +470,7 @@
     Motor.destinos(P).forEach(function (d, i) {
       var caminho = 'areas.' + d.chave;
       if (d.modo === 'pct') {
-        areas.push(reg(d.rotuloN, [inp(caminho, 'pct'), un('%'),
+        areas.push(reg(d.rotuloN, [inp(caminho, 'pct', { sugerido: d.usual }), un('%'),
           calc(function (r) { return n(r.areas.perdas[i].m2, 0) + ' m²'; }, 'fraco')], d.nota));
       } else {
         areas.push(reg(d.rotuloN, [inp(caminho, 'num'), un('m²'),
@@ -492,9 +531,11 @@
     f.appendChild(quadro('Produtos', 'o tipo define como vende; o pagamento define como recebe', [grade(colProd, [
       { rot: 'Tipo', cels: idxP.map(function (i) {
           return inp('produtos.' + i + '.tipo', 'sel', { opcoes: ['residencial', 'comercial'], remonta: true }); }) },
-      { rot: 'Área do lote (m²)', cels: idxP.map(function (i) { return inp('produtos.' + i + '.area', 'num'); }) },
-      { rot: 'Preço de venda (R$/m²)', cels: idxP.map(function (i) { return inp('produtos.' + i + '.precoM2', 'num'); }) },
-      { rot: 'Preço do lote (R$)', cels: idxP.map(function (i) {
+      { rot: 'Área do lote', cels: idxP.map(function (i) {
+          return inp('produtos.' + i + '.area', 'num', { un: 'm²' }); }) },
+      { rot: 'Preço de venda por m²', cels: idxP.map(function (i) {
+          return inp('produtos.' + i + '.precoM2', 'num', { un: 'R$' }); }) },
+      { rot: 'Preço do lote', cels: idxP.map(function (i) {
           return calc(function (r) { return r.prog.prods[i].precoLote ? n(r.prog.prods[i].precoLote, 0) : '—'; }); }) },
       { rot: 'Forma de pagamento', cels: idxP.map(function (i) {
           return inp('produtos.' + i + '.pagamento', 'sel', { opcoes: opcoesPagamento() }); }) },

@@ -21,7 +21,7 @@
   --rot:296px; --campo:132px; --comp:176px; --uni:38px; --gap:12px; --dentro:8px;
   /* uma altura de linha e seis tamanhos de letra governam a plataforma
      inteira — só o fluxo de caixa, por ser denso, tem escala própria */
-  --linha:34px; --alt:28px; --lh:1.45; --sufixo:15px;
+  --linha:34px; --alt:28px; --lh:1.45; --sufixo:21px; --prefixo:25px;
   --t-tit:12.5px; --t-rot:12.5px; --t-val:12.5px;
   --t-uni:11.5px; --t-nota:11.5px; --t-cab:10.5px;
   --sans:'IBM Plex Sans',system-ui,sans-serif;
@@ -130,15 +130,19 @@ details.quadro>summary:focus-visible{outline:2px solid var(--acento);outline-off
 input,select{font:inherit;font-family:var(--mono);font-size:var(--t-val);background:var(--campo-bg);
   border:1px solid var(--campo-borda);border-radius:3px;padding:4px var(--dentro);text-align:right;
   color:var(--ink);width:var(--campo);max-width:100%;min-width:0;height:var(--alt);line-height:1.2}
-/* todo campo numérico guarda a mesma folga à direita; nos percentuais ela
-   recebe o sinal, de modo que os dígitos caem sempre na mesma coluna */
+/* todo campo numérico guarda a mesma folga à direita; % e m² a ocupam, de
+   modo que os dígitos caem sempre na mesma coluna. R$ vai do lado esquerdo,
+   onde não disputa espaço com o número. */
 input.num{padding-right:calc(var(--dentro) + var(--sufixo))}
+input.num.com-prefixo{padding-left:calc(var(--dentro) + var(--prefixo))}
 .campo{position:relative;display:inline-block;width:var(--campo);max-width:100%;vertical-align:middle}
 .campo>input{width:100%}
-.campo>.sufixo{position:absolute;right:var(--dentro);top:0;height:var(--alt);display:flex;
+.campo>.sufixo,.campo>.prefixo{position:absolute;top:0;height:var(--alt);display:flex;
   align-items:center;font-family:var(--mono);font-size:var(--t-val);color:var(--muted);
   pointer-events:none}
-.campo>input:disabled+.sufixo{color:var(--muted);opacity:.7}
+.campo>.sufixo{right:var(--dentro)}
+.campo>.prefixo{left:var(--dentro)}
+.campo>input:disabled~.sufixo,.campo>input:disabled~.prefixo{opacity:.7}
 select{font-family:var(--sans);text-align:left}
 input[type=text]{font-family:var(--sans);text-align:left}
 input.num{font-family:var(--mono);text-align:right}
@@ -147,11 +151,15 @@ input.limitado{border-color:var(--warn);background:var(--aviso-bg)}
 input:focus,select:focus{outline:2px solid var(--campo-foco);outline-offset:-1px}
 input:disabled{background:transparent;border-color:var(--rule-soft);color:var(--muted);
   opacity:.7;cursor:default}
+/* número sugerido: está lá e entra na conta, mas ainda é sugestão da
+   plataforma, não dado do avaliador — por isso a letra mais clara */
+input.sugerido{color:var(--muted)}
 .un{font-size:var(--t-uni);color:var(--muted);white-space:nowrap}
 /* o recuo faz os dígitos calculados caírem na mesma coluna dos digitados */
 .calc{font-family:var(--mono);font-size:var(--t-val);text-align:right;color:var(--ink);
   padding-right:calc(var(--dentro) + var(--sufixo) + 1px);font-variant-numeric:tabular-nums}
 .reg>.val>.calc{display:block;width:100%}
+.calc.txt{padding-right:var(--dentro)}
 .calc.fraco{color:var(--muted)}
 
 /* ---------- grades: herdam a mesma grade dos registros ---------- */
