@@ -40,31 +40,78 @@
   function pmtFator(i, n) { return i > 0 ? i / (1 - Math.pow(1 + i, -n)) : (n > 0 ? 1 / n : 0); }
 
   /* ---------------------------------------------------------------- áreas */
-  /* Na planilha, viário, doações, verdes/APP e lazer são digitados em % da gleba;
-     faixa não edificante e área com restrição são digitadas em m². */
-  var PERDAS = [
-    { chave: 'viario',    rotulo: '2 · Sistema viário',              modo: 'pct',
-      nota: 'Ruas e calçadas do loteamento — percentual típico entre 18% e 22% da gleba.' },
-    { chave: 'doacoes',   rotulo: '3 · Doações ao município',        modo: 'pct',
-      nota: 'Doação ao município para equipamentos públicos e lazer — mínimo usual de 5%.' },
-    { chave: 'verdes',    rotulo: '4 · Áreas verdes e APP',          modo: 'pct',
-      nota: 'Áreas verdes e de preservação permanente exigidas pelo licenciamento.' },
-    { chave: 'lazer',     rotulo: '5 · Lazer e áreas comuns',        modo: 'pct',
-      nota: 'Lazer, portaria, apoio técnico, áreas patrimoniais, paisagismo e acesso.' },
-    { chave: 'faixa',     rotulo: '6 · Faixa não edificante',        modo: 'm2',
+  /* O estudo atende a duas modalidades de parcelamento. As três primeiras
+     destinações mudam de nome e de percentual usual conforme a modalidade; a
+     APP, a faixa não edificante e a área com restrição valem para as duas.
+     Cada modalidade guarda os próprios percentuais, então alternar entre elas
+     não apaga o que foi digitado na outra. */
+  var MODALIDADES = {
+    aberto: {
+      chave: 'aberto', rotulo: 'Loteamento aberto',
+      destinos: [
+        { chave: 'circulacao', rotulo: 'Sistema viário', usual: 0.20,
+          nota: 'Ruas e calçadas do loteamento, doadas ao município. Usual de 20% da gleba.' },
+        { chave: 'verdeLazer', rotulo: 'Área verde/lazer', usual: 0.10,
+          nota: 'Áreas verdes e de lazer de uso público. Usual de 10% da gleba.' },
+        { chave: 'institucional', rotulo: 'Área institucional', usual: 0.05,
+          nota: 'Doação ao município para equipamentos públicos. Usual de 5% da gleba.' }
+      ]
+    },
+    condominio: {
+      chave: 'condominio', rotulo: 'Condomínio de lotes',
+      destinos: [
+        { chave: 'circulacao', rotulo: 'Circulação interna', usual: 0.15,
+          nota: 'Vias internas do condomínio, que permanecem privadas. Usual de 15% da gleba.' },
+        { chave: 'verdeLazer', rotulo: 'Lazer e áreas verdes', usual: 0.10,
+          nota: 'Lazer e áreas verdes de uso comum dos condôminos. Usual de 10% da gleba.' },
+        { chave: 'institucional', rotulo: 'Portaria, apoio e drenagem', usual: 0.05,
+          nota: 'Portaria, apoio técnico, reservatórios e drenagem. Usual de 5% da gleba.' }
+      ]
+    }
+  };
+  var COMUNS = [
+    { chave: 'app', rotulo: 'APP', modo: 'pct',
+      nota: 'Área de preservação permanente reconhecida no licenciamento ambiental.' },
+    { chave: 'faixa', rotulo: 'Faixa não edificante', modo: 'm2',
       nota: 'Faixas de servidão e domínio: rodovias, linhas de transmissão, dutos.' },
-    { chave: 'restricao', rotulo: '7 · Área com possível restrição', modo: 'm2',
+    { chave: 'restricao', rotulo: 'Área com possível restrição', modo: 'm2',
       nota: 'Reserva para eventuais restrições identificadas no licenciamento.' }
   ];
+  function modalidade(P) {
+    var t = P && P.areas && P.areas.tipo;
+    return MODALIDADES[t] || MODALIDADES.aberto;
+  }
+  /* Lista as seis deduções da modalidade escolhida, já numeradas de 2 a 7. */
+  function destinos(P) {
+    var m = modalidade(P);
+    var lista = m.destinos.map(function (d) {
+      return { chave: m.chave + '.' + d.chave, campo: d.chave, rotulo: d.rotulo,
+               modo: 'pct', nota: d.nota, usual: d.usual };
+    });
+    COMUNS.forEach(function (d) {
+      lista.push({ chave: d.chave, campo: d.chave, rotulo: d.rotulo, modo: d.modo, nota: d.nota });
+    });
+    return lista.map(function (d, i) { d.n = i + 2; d.rotuloN = (i + 2) + ' · ' + d.rotulo; return d; });
+  }
+  function valorDestino(a, d) {
+    var i = d.chave.indexOf('.');
+    if (i < 0) return num(a[d.chave]);
+    var grupo = a[d.chave.slice(0, i)];
+    return grupo ? num(grupo[d.chave.slice(i + 1)]) : 0;
+  }
   function quadroAreas(P) {
     var a = P.areas, G = num(a.gleba);
-    var perdas = PERDAS.map(function (d) {
-      var m2 = d.modo === 'pct' ? num(a[d.chave]) * G : num(a[d.chave]);
-      return { chave: d.chave, rotulo: d.rotulo, modo: d.modo, nota: d.nota,
-               entrada: num(a[d.chave]), m2: m2, pct: G > 0 ? m2 / G : 0 };
+    var perdas = destinos(P).map(function (d) {
+      var entrada = valorDestino(a, d);
+      var m2 = d.modo === 'pct' ? entrada * G : entrada;
+      return { chave: d.chave, campo: d.campo, n: d.n, rotulo: d.rotuloN, modo: d.modo,
+               nota: d.nota, usual: d.usual, entrada: entrada, m2: m2,
+               pct: G > 0 ? m2 / G : 0 };
     });
     var totalPerdas = perdas.reduce(function (s, x) { return s + x.m2; }, 0);
-    return { gleba: G, perdas: perdas, totalPerdas: totalPerdas,
+    var m = modalidade(P);
+    return { gleba: G, perdas: perdas, totalPerdas: totalPerdas, modalidade: m.chave,
+             modalidadeRotulo: m.rotulo,
              pctPerdas: G > 0 ? totalPerdas / G : 0, alvDisponivel: G - totalPerdas,
              pctALV: G > 0 ? (G - totalPerdas) / G : 0 };
   }
@@ -615,5 +662,6 @@
     };
   }
 
-  root.Motor = { calcular: calcular, HORIZONTE: HORIZONTE, COLUNAS: COLUNAS };
+  root.Motor = { calcular: calcular, HORIZONTE: HORIZONTE, COLUNAS: COLUNAS,
+                 MODALIDADES: MODALIDADES, destinos: destinos };
 })(typeof window !== 'undefined' ? window : globalThis);

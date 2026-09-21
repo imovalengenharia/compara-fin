@@ -10,8 +10,11 @@
   function premissasPadrao() {
     return {
       identificacao: { nome: 'Gleba Itu — lotes', municipio: 'Itu', uf: 'SP', data: '23/09/2025' },
-      areas: { gleba: 160084, viario: 0.24022388246170762, doacoes: 0.025,
-               verdes: 0.1288136228480048, lazer: 0.10466942355263506, faixa: 14408, restricao: 0 },
+      areas: { tipo: 'aberto', gleba: 160084,
+               aberto:     { circulacao: 0.24022388246170762, verdeLazer: 0.10466942355263506,
+                             institucional: 0.025 },
+               condominio: { circulacao: 0.15, verdeLazer: 0.10, institucional: 0.05 },
+               app: 0.1288136228480048, faixa: 14408, restricao: 0 },
       prazos: { preOp: 18, nFases: 1 },
       produtos: [
         { tipo: 'residencial', area: 391.406, precoM2: 1250, pagamento: 'mix', momento: 'Intermediário' },
@@ -131,9 +134,14 @@
 
   /* ------------------------------------------------------- trava da ALV */
   function alvDisponivelP() {
-    var a = P.areas, G = +a.gleba || 0;
-    var pct = (+a.viario || 0) + (+a.doacoes || 0) + (+a.verdes || 0) + (+a.lazer || 0);
-    return G - (pct * G + (+a.faixa || 0) + (+a.restricao || 0));
+    var a = P.areas, G = +a.gleba || 0, perdas = 0;
+    Motor.destinos(P).forEach(function (d) {
+      var i = d.chave.indexOf('.'), v;
+      if (i < 0) v = +a[d.chave] || 0;
+      else { var g = a[d.chave.slice(0, i)]; v = g ? (+g[d.chave.slice(i + 1)] || 0) : 0; }
+      perdas += d.modo === 'pct' ? v * G : v;
+    });
+    return G - perdas;
   }
   function nFasesP() { return Math.max(1, Math.min(4, Math.round(+P.prazos.nFases || 1))); }
   function alvUsadaExcluindo(pEx, fEx) {
@@ -341,14 +349,18 @@
 
   /* rótulo | valor | unidade | complemento | nota — colunas fixas em toda a plataforma */
   function reg(rot, celulas, nota, forte) {
-    var linha = e('div', { cls: 'reg' + (forte ? ' forte' : '') }, [e('div', { cls: 'rot', txt: rot })]);
     celulas = (celulas || []).filter(Boolean);
+    var temUn = celulas[1] && celulas[1].className === 'un';
+    /* uma lista sem unidade ocupa também a coluna da unidade: o rótulo da
+       opção é texto e não cabe na largura de um campo numérico */
+    var amplo = !temUn && celulas[0] && celulas[0].tagName === 'SELECT';
+    var linha = e('div', { cls: 'reg' + (forte ? ' forte' : '') + (amplo ? ' amplo' : '') },
+      [e('div', { cls: 'rot', txt: rot })]);
     if (celulas.length > 3) {
       linha.appendChild(e('div', { cls: 'livre' }, celulas));
     } else {
-      var temUn = celulas[1] && celulas[1].className === 'un';
       linha.appendChild(e('div', { cls: 'val' }, celulas[0] ? [celulas[0]] : []));
-      linha.appendChild(e('div', { cls: 'uni' }, temUn ? [celulas[1]] : []));
+      if (!amplo) linha.appendChild(e('div', { cls: 'uni' }, temUn ? [celulas[1]] : []));
       var comp = temUn ? celulas[2] : celulas[1];
       linha.appendChild(e('div', { cls: 'comp' }, comp ? [comp] : []));
     }
@@ -398,34 +410,45 @@
     var f = document.createDocumentFragment();
     f.appendChild(faixaALV());
 
-    /* 1 — quadro de áreas */
-    var areas = [reg('1 · Área total da gleba',
-      [inp('areas.gleba', 'num'), un('m²'), calc(function (r) { return pc(1); }, 'fraco')],
-      'Área da matrícula ou do levantamento planialtimétrico.')];
-    [['viario', '2 · Sistema viário', 'pct', 'Ruas e calçadas — entre 18% e 22% da gleba é o usual.'],
-     ['doacoes', '3 · Doações ao município', 'pct', 'Equipamentos públicos e lazer — mínimo usual de 5%.'],
-     ['verdes', '4 · Áreas verdes e APP', 'pct', 'Exigidas pelo licenciamento ambiental.'],
-     ['lazer', '5 · Lazer e áreas comuns', 'pct', 'Lazer, portaria, apoio técnico, paisagismo e acesso.'],
-     ['faixa', '6 · Faixa não edificante', 'm2', 'Servidões e faixas de domínio: rodovia, linhão, dutos.'],
-     ['restricao', '7 · Área com possível restrição', 'm2', 'Reserva para restrições do licenciamento.']
-    ].forEach(function (d, i) {
-      var chave = d[0];
-      if (d[2] === 'pct') {
-        areas.push(reg(d[1], [inp('areas.' + chave, 'pct'), un('%'),
-          calc(function (r) { return n(r.areas.perdas[i].m2, 0) + ' m²'; }, 'fraco')], d[3]));
+    /* 1 — quadro de áreas, conforme a modalidade de parcelamento */
+    var MOD = Motor.MODALIDADES, modal = MOD[P.areas.tipo] || MOD.aberto;
+    var areas = [
+      reg('Modalidade de parcelamento',
+        [inp('areas.tipo', 'sel', { remonta: true,
+          opcoes: [['aberto', MOD.aberto.rotulo], ['condominio', MOD.condominio.rotulo]] })],
+        modal.chave === 'aberto'
+          ? 'As áreas públicas são doadas ao município e os lotes têm acesso por via pública.'
+          : 'Vias, lazer e apoio permanecem privados, em fração ideal dos condôminos.'),
+      reg('1 · Área total da gleba',
+        [inp('areas.gleba', 'num'), un('m²'), calc(function (r) { return pc(1); }, 'fraco')],
+        'Área da matrícula ou do levantamento planialtimétrico.')
+    ];
+    Motor.destinos(P).forEach(function (d, i) {
+      var caminho = 'areas.' + d.chave;
+      if (d.modo === 'pct') {
+        areas.push(reg(d.rotuloN, [inp(caminho, 'pct'), un('%'),
+          calc(function (r) { return n(r.areas.perdas[i].m2, 0) + ' m²'; }, 'fraco')], d.nota));
       } else {
-        areas.push(reg(d[1], [inp('areas.' + chave, 'num'), un('m²'),
-          calc(function (r) { return pc(r.areas.perdas[i].pct, 2); }, 'fraco')], d[3]));
+        areas.push(reg(d.rotuloN, [inp(caminho, 'num'), un('m²'),
+          calc(function (r) { return pc(r.areas.perdas[i].pct, 2); }, 'fraco')], d.nota));
       }
     });
-    areas.push(reg('8 · Perdas totais (2 a 7)',
+    areas.push(reg('8 · Total das destinações (2 a 7)',
       [calc(function (r) { return n(r.areas.totalPerdas, 0) + ' m²'; }),
-       calc(function (r) { return pc(r.areas.pctPerdas, 2); }, 'fraco')], 'Soma das seis condições acima.', true));
+       calc(function (r) { return pc(r.areas.pctPerdas, 2); }, 'fraco')],
+      'Soma das seis condições acima.', true));
     areas.push(reg('9 · ALV disponível (1 − 8)',
       [calc(function (r) { return n(r.areas.alvDisponivel, 0) + ' m²'; }),
        calc(function (r) { return pc(r.areas.pctALV, 2); }, 'fraco')],
       'Área líquida vendável: o que sobra para venda. É o teto físico do programa.', true));
-    f.appendChild(quadro('Quadro de áreas', 'condição · área · % sobre a gleba', areas));
+    f.appendChild(quadro('Quadro de áreas', modal.rotulo + ' · destinação · área · % sobre a gleba',
+      areas,
+      'Referência de mercado — loteamento aberto: 20% de sistema viário, 10% de área verde/lazer e ' +
+      '5% de área institucional, restando 65% de ALV. Condomínio de lotes: 15% de circulação interna, ' +
+      '10% de lazer e áreas verdes e 5% de portaria, apoio e drenagem, restando 70% de ALV. A área de ' +
+      'lotes do loteamento e os lotes privativos do condomínio são a mesma coisa: a ALV. APP, faixa não ' +
+      'edificante e área com restrição entram além disso, quando houver. Cada modalidade guarda os ' +
+      'próprios percentuais, então alternar entre elas não apaga o que você digitou na outra.'));
 
     /* 2 — eventos e faseamento */
     f.appendChild(quadro('Eventos e faseamento', 'o mês 0 é a data-base do estudo', [
@@ -947,7 +970,8 @@
       function p(html) { box.appendChild(e('p', { html: html })); }
       var num = function (t) { return '<span class="num">' + t + '</span>'; };
       h('1 · Síntese do negócio');
-      p('Gleba de ' + num(n(r.areas.gleba, 0) + ' m²') + ' com área líquida vendável de ' +
+      p('Estudo na modalidade ' + num(r.areas.modalidadeRotulo.toLowerCase()) + '. ' +
+        'Gleba de ' + num(n(r.areas.gleba, 0) + ' m²') + ' com área líquida vendável de ' +
         num(n(r.areas.alvDisponivel, 0) + ' m²') + ' (' + pc(r.areas.pctALV) + ' da gleba). O programa prevê ' +
         num(n(r.prog.lotesRes, 0) + ' lotes residenciais') + ' e ' + num(n(r.prog.lotesCom, 0) + ' comerciais') +
         ' em ' + num(r.prog.nFases + (r.prog.nFases > 1 ? ' fases' : ' fase')) + ', com VGV de tabela de ' +
@@ -1168,7 +1192,17 @@
       var salvo = localStorage.getItem('involutivo.premissas');
       if (salvo) {
         var p = JSON.parse(salvo);
-        if (p && p.areas && p.planos && p.areas.viario < 1) {
+        if (p && p.areas && p.planos && (p.areas.tipo || p.areas.viario < 1)) {
+          /* formato anterior: um único quadro de perdas, sem modalidade */
+          if (!p.areas.tipo) {
+            p.areas = { tipo: 'aberto', gleba: p.areas.gleba,
+              aberto: { circulacao: p.areas.viario || 0, verdeLazer: p.areas.lazer || 0,
+                        institucional: p.areas.doacoes || 0 },
+              condominio: { circulacao: .15, verdeLazer: .10, institucional: .05 },
+              app: p.areas.verdes || 0, faixa: p.areas.faixa || 0, restricao: p.areas.restricao || 0 };
+          }
+          if (!p.areas.aberto) p.areas.aberto = { circulacao: .20, verdeLazer: .10, institucional: .05 };
+          if (!p.areas.condominio) p.areas.condominio = { circulacao: .15, verdeLazer: .10, institucional: .05 };
           if (!p.terreno) p.terreno = { modo: (p.permuta && p.permuta.modo === 'fixo') ? 'informado' : 'resolver',
             forma: 'permuta', pctDinheiro: .4, valorDinheiro: p.custos ? (p.custos.aquisicao || 0) : 0,
             permutaPct: p.permuta ? p.permuta.valor : .42 };

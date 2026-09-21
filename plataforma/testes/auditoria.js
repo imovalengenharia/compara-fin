@@ -32,8 +32,11 @@ function fmt(v) {
 function ITU(over) {
   var P = {
     identificacao: { nome: 'Gleba Itu', municipio: 'Itu', uf: 'SP' },
-    areas: { gleba: 160084, viario: 0.24022388246170762, doacoes: 0.025,
-             verdes: 0.1288136228480048, lazer: 0.10466942355263506, faixa: 14408, restricao: 0 },
+    areas: { tipo: 'aberto', gleba: 160084,
+             aberto:     { circulacao: 0.24022388246170762, verdeLazer: 0.10466942355263506,
+                           institucional: 0.025 },
+             condominio: { circulacao: 0.15, verdeLazer: 0.10, institucional: 0.05 },
+             app: 0.1288136228480048, faixa: 14408, restricao: 0 },
     prazos: { preOp: 18, nFases: 1 },
     produtos: [
       { tipo: 'residencial', area: 391.406, precoM2: 1250, pagamento: 'mix', momento: 'Intermediário' },
