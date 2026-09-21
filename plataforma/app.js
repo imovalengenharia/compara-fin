@@ -1289,14 +1289,30 @@
     var lista = abasVisiveis();
     var aba = lista.filter(function (a) { return a.id === abaAtiva; })[0];
     if (!aba) { abaAtiva = 'premissas'; aba = lista[0]; }
+    alvo.classList.toggle('planilha', abaAtiva === 'fluxo');
     alvo.appendChild(aba.render());
     aplicar();
     window.scrollTo(0, y);
   }
 
+  /* a janela do fluxo cresce até o pé da tela: o que sobra abaixo dela é só
+     a nota de uma linha. Medir é mais seguro que somar as barras na mão. */
+  function ajustarPlanilha() {
+    var r = document.querySelector('.folha.planilha .rolagem');
+    if (!r) return;
+    var alto = window.innerHeight - r.getBoundingClientRect().top - 12;
+    r.style.maxHeight = Math.max(300, alto) + 'px';
+    /* o que ainda sobrar embaixo — a nota e as margens — desconta do quadro:
+       medir a sobra é mais seguro que somar padding e margem na mão */
+    var excesso = document.documentElement.scrollHeight - window.innerHeight;
+    if (excesso > 0) r.style.maxHeight = Math.max(300, alto - excesso) + 'px';
+  }
+  window.addEventListener('resize', ajustarPlanilha);
+
   function aplicar() {
     if (!R) return;
     atualizadores.forEach(function (fn) { try { fn(R); } catch (err) {} });
+    ajustarPlanilha();
     var topo = document.getElementById('resumo-topo');
     topo.textContent = '';
     [['Valor da gleba', R$(R.ind.valorTerreno)],

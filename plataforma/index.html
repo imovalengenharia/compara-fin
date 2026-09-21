@@ -78,6 +78,9 @@ button{font:inherit;color:inherit}
 
 /* ---------- folha ---------- */
 .folha{padding:18px 20px 60px;max-width:1680px;margin:0 auto}
+/* o fluxo de caixa é uma planilha: ocupa a página inteira, sem margem de
+   leitura e sem rolagem dupla — a janela do quadro é que rola */
+.folha.planilha{max-width:none;padding:12px 12px 10px}
 .folha-topo{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}
 .folha-topo:empty{display:none}
 .selo{font-size:var(--t-cab);letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;border-radius:3px;
@@ -201,6 +204,7 @@ table.grade tr.forte td{border-top:1px solid var(--rule)}
 
 /* ---------- tabelas de saída ---------- */
 .rolagem{overflow:auto;max-height:70vh;border:1px solid var(--rule);border-radius:4px;background:var(--surface)}
+.folha.planilha .rolagem{max-height:calc(100vh - 172px)}
 table.dados{width:100%;border-collapse:separate;border-spacing:0;font-size:var(--t-rot)}
 table.dados th{position:sticky;top:0;background:var(--surface);color:var(--muted);font-weight:500;
   text-align:right;padding:7px 9px;border-bottom:1px solid var(--rule);white-space:nowrap;z-index:2;
