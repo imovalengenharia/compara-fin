@@ -1304,6 +1304,24 @@
               condominio: { circulacao: .15, verdeLazer: .10, institucional: .05 },
               app: p.areas.verdes || 0, faixa: p.areas.faixa || 0, restricao: p.areas.restricao || 0 };
           }
+          /* Premissas salvas antes da regra do sugerido não distinguiam "por
+             informar" de "informado": o que estiver exatamente no usual veio
+             do padrão de então, não do avaliador, e volta a ser sugestão. */
+          if (!p.sugeridos) {
+            Object.keys(Motor.USUAIS).forEach(function (k) {
+              var i = k.indexOf('.'), g = k.slice(0, i), c = k.slice(i + 1);
+              if (!p[g]) return;
+              if (Math.abs((+p[g][c] || 0) - Motor.USUAIS[k]) < 1e-9) p[g][c] = null;
+            });
+            if (p.custos && !p.custos.obraPctVGV) p.custos.obraPctVGV = null;
+            ['aberto', 'condominio'].forEach(function (mod) {
+              if (!p.areas[mod]) return;
+              Motor.MODALIDADES[mod].destinos.forEach(function (d) {
+                if (Math.abs((+p.areas[mod][d.chave] || 0) - d.usual) < 1e-9) p.areas[mod][d.chave] = null;
+              });
+            });
+            p.sugeridos = 1;
+          }
           /* o plano à vista é definição: uma parcela, 100% de entrada */
           if (p.planos && p.planos[0]) { p.planos[0].n = 1; p.planos[0].entrada = 1; }
           if (!p.areas.aberto) p.areas.aberto = { circulacao: .20, verdeLazer: .10, institucional: .05 };
