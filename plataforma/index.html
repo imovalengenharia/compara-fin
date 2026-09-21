@@ -196,7 +196,8 @@ table.grade td>input,table.grade td>select,table.grade td>.calc,table.grade td>.
   width:var(--campo);display:inline-block;text-align:right;vertical-align:middle}
 table.grade tr.forte td{border-top:1px solid var(--rule)}
 .nota-linha{font-size:var(--t-nota);color:var(--muted);line-height:var(--lh)}
-.nota-bloco{font-size:var(--t-nota);color:var(--muted);padding:8px 0 2px;line-height:var(--lh);max-width:172ch}
+/* a nota corre até o fim do quadro: quebrar antes deixa um vazio à direita */
+.nota-bloco{font-size:var(--t-nota);color:var(--muted);padding:8px 0 2px;line-height:var(--lh)}
 
 /* ---------- tabelas de saída ---------- */
 .rolagem{overflow:auto;max-height:70vh;border:1px solid var(--rule);border-radius:4px;background:var(--surface)}

@@ -913,46 +913,6 @@
     var entradas = e('div', {}, linhasTerreno);
     var tabelaTerreno = e('div', { style: 'overflow-x:auto' });
     var notaTerreno = e('p', { cls: 'nota-bloco' });
-    /* a escala é um cálculo sob demanda: os nós vivem fora do redesenho, para
-       que a tabela calculada não suma a cada recálculo */
-    var escala = e('div');
-    var btnEscala = e('button', { cls: 'acao-clara', type: 'button',
-      txt: 'Calcular a escala de formas de pagamento' });
-    btnEscala.addEventListener('click', function () {
-      btnEscala.disabled = true; btnEscala.textContent = 'calculando…';
-      setTimeout(function () {
-        /* o teto à vista é o maior dinheiro que o estudo suporta: a escala
-           varre desse limite até a permuta pura */
-        var soPerm = JSON.parse(JSON.stringify(P));
-        soPerm.terreno = { modo: 'resolver', forma: 'avista', valorDinheiro: 0,
-                           sinal: P.terreno.sinal, permutaPct: 0 };
-        var teto = Motor.calcular(soPerm).ind.caixaTerreno;
-        var pontos = [0, 0.25, 0.5, 0.75, 1].map(function (a) {
-          var copia = JSON.parse(JSON.stringify(P));
-          copia.terreno = { modo: 'resolver', valorDinheiro: a * teto, sinal: P.terreno.sinal,
-            permutaPct: 0, forma: a === 0 ? 'permuta' : a === 1 ? 'avista' : 'misto' };
-          var x = Motor.calcular(copia).ind;
-          /* a fração se mede em valor presente: o dinheiro parcelado vale
-             menos que o seu nominal */
-          return { a: x.pctDinheiroEfetivo, valor: x.valorTerreno, vista: x.equivalenteVista,
-                   caixa: x.caixaTerreno, perm: x.permutaPct, inv: x.investimento, pb: x.payback };
-        });
-        var th = e('tr', {}, ['Pago em dinheiro', 'Valor da gleba', 'Equivalente à vista',
-          'Em dinheiro (R$)', 'Permuta (% da receita líq.)', 'Investimento requerido', 'Payback']
-          .map(function (t) { return e('th', { txt: t }); }));
-        var tb = e('tbody');
-        pontos.forEach(function (x) {
-          tb.appendChild(e('tr', {}, [e('td', { txt: pc(x.a) }), e('td', { txt: R$(x.valor) }),
-            e('td', { txt: R$(x.vista) }), e('td', { txt: R$(x.caixa) }), e('td', { txt: pc(x.perm) }),
-            e('td', { txt: R$(x.inv) }), e('td', { txt: n(x.pb, 0) + ' meses' })]));
-        });
-        escala.textContent = '';
-        escala.appendChild(e('div', { style: 'overflow-x:auto;margin-top:10px' },
-          [e('table', { cls: 'dados' }, [e('thead', {}, [th]), tb])]));
-        escala.appendChild(e('p', { cls: 'nota-bloco', txt: 'Mesma TIR em todas as linhas — o que muda é quanto a terra pode custar conforme o desembolso é antecipado. É a régua da negociação: quanto o terrenista precisa aceitar em permuta para que o preço pedido caiba no estudo.' }));
-        btnEscala.disabled = false; btnEscala.textContent = 'Recalcular a escala';
-      }, 20);
-    });
     atualizadores.push(function (r) {
       boxTopo.textContent = ''; boxFim.textContent = ''; tabelaTerreno.textContent = '';
       var i = r.ind, T = r.totais;
@@ -1062,10 +1022,12 @@
       tabelaTerreno.appendChild(e('table', { cls: 'dados' }, [e('thead', {}, [thP]), tbP]));
       notaTerreno.textContent =
         'O nominal é a soma do que o terrenista recebe, em moeda da data-base. O valor presente ' +
-        'desconta cada recebimento pela taxa real do terrenista, ' + pc(i.taxaTerrenista) +
-        ' a.a. — o sinal está no mês 0 e não desconta. Hoje ' + pc(i.pctDinheiroEfetivo) +
-        ' do negócio está em dinheiro. Adiar o pagamento aumenta o nominal que cabe no estudo, ' +
-        'sem mudar o que ele vale hoje.';
+        'desconta cada recebimento pela taxa real do terrenista, ' + pc(i.taxaTerrenista) + ' a.a.' +
+        (i.vpSinal > 0.5 ? ' — o sinal está no mês 0 e não desconta.' : '') + ' ' +
+        (i.caixaTerreno > 0.5
+          ? 'Hoje ' + pc(i.pctDinheiroEfetivo) + ' do negócio está em dinheiro, e o resto em permuta. '
+          : 'O negócio inteiro está em permuta. ') +
+        'Adiar o pagamento aumenta o nominal que cabe no estudo, sem mudar o que ele vale hoje.';
 
       boxFim.appendChild(e('div', {}, [
         quadro('Demonstrativo de resultados', 'valores deflacionados pelo IPCA',
@@ -1104,8 +1066,7 @@
          e('p', { cls: 'nota-bloco', txt: modoResolver
            ? 'O solver busca o que zera o VPL na TMA: com o dinheiro definido, resolve a permuta; na aquisição à vista, resolve o próprio dinheiro. Antecipar o desembolso reduz o teto — pagar tudo à vista vale menos para o empreendedor do que a mesma quantia diluída em permuta.'
            : 'Dinheiro e permuta estão travados no que você definiu, e o modelo devolve a TIR que sobra.' }),
-         e('div', { cls: 'divisa' }), tabelaTerreno, notaTerreno,
-         e('div', { style: 'padding:12px 0 2px' }, [btnEscala, escala])])
+         e('div', { cls: 'divisa' }), tabelaTerreno, notaTerreno])
     ]));
     f.appendChild(boxFim);
     return f;

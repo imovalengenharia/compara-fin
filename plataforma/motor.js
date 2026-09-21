@@ -686,7 +686,9 @@
         pctDinheiroEfetivo: M.equivalenteVista > 0 ? M.vpCaixa / M.equivalenteVista : 0,
         excedePermuta: excedePermuta,
         parcelasTerreno: Math.max(1, Math.round(num(P.janelas.terrenoParc, 1))),
-        mesTerreno: num(P.janelas.terrenoIni, 0), sinalTerreno: Math.max(0, num(T.sinal)),
+        /* o sinal que vale é o que o negócio comporta: na permuta pura não há
+           dinheiro, e o valor guardado no campo não entra em lugar nenhum */
+        mesTerreno: num(P.janelas.terrenoIni, 0), sinalTerreno: M.valores.sinalPago,
         valorM2Gleba: areas.gleba > 0 ? M.valorTerreno / areas.gleba : 0,
         valorM2ALV: prog.alv > 0 ? M.valorTerreno / prog.alv : 0,
         itbi: M.valores.itbiV,
