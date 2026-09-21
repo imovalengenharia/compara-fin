@@ -441,14 +441,7 @@
       [calc(function (r) { return n(r.areas.alvDisponivel, 0) + ' m²'; }),
        calc(function (r) { return pc(r.areas.pctALV, 2); }, 'fraco')],
       'Área líquida vendável: o que sobra para venda. É o teto físico do programa.', true));
-    f.appendChild(quadro('Quadro de áreas', modal.rotulo + ' · destinação · área · % sobre a gleba',
-      areas,
-      'Referência de mercado — loteamento aberto: 20% de sistema viário, 10% de área verde/lazer e ' +
-      '5% de área institucional, restando 65% de ALV. Condomínio de lotes: 15% de circulação interna, ' +
-      '10% de lazer e áreas verdes e 5% de portaria, apoio e drenagem, restando 70% de ALV. A área de ' +
-      'lotes do loteamento e os lotes privativos do condomínio são a mesma coisa: a ALV. APP, faixa não ' +
-      'edificante e área com restrição entram além disso, quando houver. Cada modalidade guarda os ' +
-      'próprios percentuais, então alternar entre elas não apaga o que você digitou na outra.'));
+    f.appendChild(quadro('Quadro de áreas', modal.rotulo + ' · destinação · área · % sobre a gleba', areas));
 
     /* 2 — eventos e faseamento */
     f.appendChild(quadro('Eventos e faseamento', 'o mês 0 é a data-base do estudo', [
