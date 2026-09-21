@@ -94,10 +94,13 @@
     }
     return t;
   }
-  /* A ALV é um limite físico: o programa nunca pode ultrapassá-la. Quando o
-     campo editado permite, ele é ajustado ao máximo possível; quando não
-     permite (mudar o nº de fases, encolher a gleba, aumentar as perdas), a
-     alteração é desfeita e a plataforma explica o que precisa mudar antes. */
+  /* A ALV é um limite físico do programa, não da gleba. Duas regras separadas:
+     · quem ACRESCENTA programa (lotes no quadro de fases, área do lote) é
+       travado no máximo que couber — nunca ultrapassa a ALV;
+     · quem descreve a GLEBA (área total, perdas, nº de fases) é sempre livre:
+       o terreno é um dado do mundo, não uma variável de projeto. Se a nova
+       gleba não comportar o programa, a alteração vale, o excesso aparece em
+       destaque no topo das premissas e um clique ajusta o programa a ela. */
   function alvUsadaTotal() { return alvUsadaExcluindo(-1, null); }
   function excessoALV() { return Math.max(0, alvUsadaTotal() - alvDisponivelP()); }
   var tempoAviso = null;
@@ -149,6 +152,40 @@
     }
   }
 
+  /* Reduz os lotes de todas as fases ativas na mesma proporção, arredondando
+     para baixo, até o programa caber na ALV disponível. */
+  function ajustarProgramaALV() {
+    var disp = alvDisponivelP(), usada = alvUsadaTotal(), nF = nFasesP();
+    if (usada <= disp + 0.5 || usada <= 0) return;
+    var k = Math.max(0, disp / usada);
+    for (var p = 0; p < P.produtos.length; p++) {
+      for (var fa = 0; fa < nF; fa++) {
+        P.quadro[p][fa] = Math.floor((+P.quadro[p][fa] || 0) * k);
+      }
+    }
+    recalcular();
+    montarFolha(true);
+    avisar('Programa ajustado à ALV', 'Os lotes das fases ativas foram reduzidos na mesma proporção ' +
+      'até caberem na área líquida vendável. Redistribua entre as fases como preferir.');
+  }
+
+  /* Faixa de alerta que vive no topo das premissas enquanto houver excesso. */
+  function faixaALV() {
+    var texto = e('span');
+    var botao = e('button', { cls: 'acao-clara', type: 'button', txt: 'Ajustar o programa à ALV' });
+    botao.addEventListener('click', ajustarProgramaALV);
+    var faixa = e('div', { cls: 'alerta ruim oculto' }, [texto, botao]);
+    atualizadores.push(function (r) {
+      var falta = -r.ind.alvFolga;
+      if (falta <= 0.5) { faixa.classList.add('oculto'); return; }
+      faixa.classList.remove('oculto');
+      texto.textContent = 'O programa lançado usa ' + n(r.ind.alvUsada, 0) + ' m² e a gleba oferece ' +
+        n(r.areas.alvDisponivel, 0) + ' m² de ALV: faltam ' + n(falta, 0) + ' m². ' +
+        'Reduza lotes no quadro de fases, aumente a gleba ou ajuste tudo de uma vez.';
+    });
+    return faixa;
+  }
+
   /* --------------------------------------------------- células e registros */
   var timer = null;
   function aoDigitar(ev) {
@@ -165,20 +202,14 @@
         v = +el.dataset.min; el.value = v;
       }
     }
-    var anterior = pegar(c), excessoAntes = excessoALV();
+    var excessoAntes = excessoALV();
     guardar(c, v);
     travarALV(el, c);
-    /* desfaz apenas o que PIORA o excesso — assim um programa já estourado
-       (vindo de um arquivo salvo) continua editável para caber de novo */
+    /* a gleba mudou e o programa não cabe mais: a edição vale, o aviso explica */
     if (excessoALV() > excessoAntes + 0.5) {
-      var excesso = excessoALV();
-      guardar(c, anterior);
-      el.value = (t === 'pct') ? Math.round((anterior || 0) * 1e6) / 1e4 : anterior;
-      el.classList.add('limitado');
-      setTimeout(function () { el.classList.remove('limitado'); }, 2200);
-      avisar('Limite da ALV', 'Esta alteração deixaria o programa com ' + n(excesso, 0) +
-        ' m² além da área líquida vendável. Reduza lotes ou a área do lote no quadro de fases antes de aplicá-la.');
-      return;
+      avisar('O programa não cabe mais na gleba', 'Faltam ' + n(excessoALV(), 0) +
+        ' m² de ALV para os lotes já lançados. Use “Ajustar o programa à ALV” no topo das premissas ' +
+        'ou reduza lotes no quadro de fases.');
     }
     var remonta = el.dataset.remonta === '1';
     clearTimeout(timer);
@@ -283,6 +314,7 @@
       e('h1', { txt: 'Premissas' }),
       e('p', { txt: 'A ordem é a da planilha: primeiro o que a gleba oferece, depois o produto que cabe nela, depois o que ele custa. Cada resultado aparece só depois das premissas que o produzem.' })
     ]));
+    f.appendChild(faixaALV());
 
     /* 1 — quadro de áreas */
     var areas = [reg('1 · Área total da gleba',
@@ -396,7 +428,7 @@
       [grade(colFases, linhasFase),
        reg('Saldo de ALV', [calc(function (r) { return n(r.ind.alvFolga, 0) + ' m²'; }),
          calc(function (r) { return r.ind.alvFolga >= -0.5 ? 'cabe na gleba' : 'NÃO CABE'; }, 'fraco')],
-         'A ALV disponível é o teto físico do programa: a plataforma não deixa ultrapassá-la.', true)],
+         'Lotes e área do lote são travados por este saldo.', true)],
       'Só as fases ativas entram no cálculo. A distribuição não precisa ser igual entre fases — normalmente não é.'));
 
     /* 5 — resumo do programa (depende de tudo acima) */
@@ -471,7 +503,7 @@
     var linhasTerreno = [
       reg('Modo', [inp('terreno.modo', 'sel', { opcoes: ['resolver', 'informado'], remonta: true })],
         modoResolver
-          ? 'Resolver: a TIR fica travada na TMA e o valor do terreno é o que resta depois de todas as receitas e despesas — ele entra no fluxo até zerar o VPL.'
+          ? 'Resolver: a TIR fica travada na TMA e o terreno recebe o que resta das receitas e despesas, até zerar o VPL.'
           : 'Informado: você trava o que está sendo pago pela terra e o modelo devolve a TIR que sobra.'),
       reg('Forma de pagamento', [inp('terreno.forma', 'sel',
         { opcoes: ['permuta', 'avista', 'misto'], remonta: true })],
@@ -967,7 +999,7 @@
       var tb = e('tbody');
       linhas.forEach(function (l) {
         tb.appendChild(e('tr', {}, [
-          e('td', {}, [e('span', { txt: l.nome }), l.obs ? e('div', { style: 'font-size:11px;color:var(--muted)', txt: l.obs }) : null]),
+          e('td', {}, [e('span', { txt: l.nome }), l.obs ? e('div', { cls: 'nota-linha', txt: l.obs }) : null]),
           e('td', { txt: n(l.a, 2) }), e('td', { txt: n(l.b, 2) }),
           e('td', { cls: l.ok ? '' : 'neg', txt: n(l.dif, 2) }),
           e('td', {}, [e('span', { cls: 'chip' + (l.ok ? '' : ' ruim') },
@@ -1013,10 +1045,10 @@
   /* ================================================================ abas */
   var ABAS = [
     { id: 'premissas', rot: 'Premissas', render: folhaPremissas },
-    { id: 'v1', rot: 'Vendas F1', render: function () { return folhaVendas(0); } },
-    { id: 'v2', rot: 'Vendas F2', render: function () { return folhaVendas(1); } },
-    { id: 'v3', rot: 'Vendas F3', render: function () { return folhaVendas(2); } },
-    { id: 'v4', rot: 'Vendas F4', render: function () { return folhaVendas(3); } },
+    { id: 'v1', rot: 'Vendas · Fase 1', render: function () { return folhaVendas(0); } },
+    { id: 'v2', rot: 'Vendas · Fase 2', render: function () { return folhaVendas(1); } },
+    { id: 'v3', rot: 'Vendas · Fase 3', render: function () { return folhaVendas(2); } },
+    { id: 'v4', rot: 'Vendas · Fase 4', render: function () { return folhaVendas(3); } },
     { id: 'fluxo', rot: 'Fluxo de caixa', render: folhaFluxo },
     { id: 'drf', rot: 'Demonstrativo', render: folhaDRF },
     { id: 'auditoria', rot: 'Auditoria', render: folhaAuditoria },
