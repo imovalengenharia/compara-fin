@@ -403,7 +403,7 @@
      peças — prefixo, dígitos e sufixo — nas mesmas posições que o campo
      digitável usa. Assim os dígitos de uma coluna caem sempre no mesmo x,
      tenham eles unidade ou não. */
-  var NUMERO = /^(R\$ )?(-?[\d.,]+)( m²| %| M)?$/;
+  var NUMERO = /^(R\$\s)?(-?[\d.,]+)(?:\s(m²|%|M))?$/;
   function calc(fn, cls) {
     var el = e('span', { cls: 'calc' + (cls ? ' ' + cls : '') });
     var pre = e('span', { cls: 'pre' }), num = e('span'), suf = e('span', { cls: 'suf' });
@@ -412,7 +412,7 @@
       var t = String(fn(r)).trim(), m = NUMERO.exec(t);
       pre.textContent = m && m[1] ? 'R$' : '';
       num.textContent = m ? m[2] : t;
-      suf.textContent = m && m[3] ? m[3].trim() : '';
+      suf.textContent = m && m[3] ? m[3] : '';
       el.classList.toggle('com-pre', !!(m && m[1]));
       /* só o que é número guarda a folga do afixo à direita; texto usa a
          célula inteira, senão quebra linha à toa */
@@ -685,9 +685,9 @@
       reg('INCC', [inp('indices.incc', 'pct'), un('% a.a.')], 'Reajusta obras, gerenciamento e contrapartidas.'),
       reg('CDI', [inp('indices.cdi', 'pct'), un('% a.a.')], 'Referência do custo de oportunidade do capital.'),
       reg('Múltiplo (fator de risco)', [inp('indices.multiplo', 'num'), un('×')], 'Multiplica o CDI para formar a taxa exigida.'),
-      reg('TMA real exigida', [calc(function (r) { return pc(r.ind.tma, 2) + ' a.a.'; })],
+      reg('TMA real exigida', [calc(function (r) { return pc(r.ind.tma, 2); }), un('a.a.')],
         '(1 + CDI × múltiplo) ÷ (1 + IPCA) − 1. Real, comparável diretamente com a TIR do modelo.', true),
-      reg('Taxa real do terrenista', [calc(function (r) { return pc(r.ind.taxaTerrenista, 2) + ' a.a.'; })],
+      reg('Taxa real do terrenista', [calc(function (r) { return pc(r.ind.taxaTerrenista, 2); }), un('a.a.')],
         'CDI deflacionado pelo IPCA. É a taxa com que o fluxo de permuta é trazido a valor presente.', true)
     ]));
 
