@@ -9,7 +9,6 @@
   /* ------------------------------------------------------------- premissas */
   function premissasPadrao() {
     return {
-      identificacao: { nome: 'Gleba Itu — lotes', municipio: 'Itu', uf: 'SP', data: '23/09/2025' },
       /* as três destinações começam no percentual usual de cada modelo — são
          sugestões da plataforma, escritas em letra clara até o avaliador
          informar as suas. APP e faixa vêm do levantamento, não do modelo. */
@@ -731,13 +730,6 @@
       'Fatia gasta na montagem; o restante acompanha o período de vendas.'));
     f.appendChild(quadro('Janelas de desembolso', 'quando cada conta sai do caixa', j,
       'Correspondem às linhas 1 a 7 do cabeçalho da aba FLUXO da planilha.'));
-
-    /* identificação, ao final */
-    f.appendChild(quadro('Identificação do estudo', null, [
-      reg('Nome', [inp('identificacao.nome', 'txt')]),
-      reg('Município', [inp('identificacao.municipio', 'txt')]),
-      reg('UF', [inp('identificacao.uf', 'txt')])
-    ]));
     return f;
   }
 
