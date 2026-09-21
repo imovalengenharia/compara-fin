@@ -36,7 +36,7 @@ function ITU(over) {
              verdes: 0.1288136228480048, lazer: 0.10466942355263506, faixa: 14408, restricao: 0 },
     prazos: { preOp: 18, nFases: 1 },
     produtos: [
-      { tipo: 'residencial', area: 391.406, precoM2: 1250, pagamento: 'planos', momento: 'Intermediário' },
+      { tipo: 'residencial', area: 391.406, precoM2: 1250, pagamento: 'mix', momento: 'Intermediário' },
       { tipo: 'comercial', area: 800, precoM2: 1250, pagamento: 'avista', momento: 'Intermediário' },
       { tipo: 'comercial', area: 85, precoM2: 1250, pagamento: 'avista', momento: 'Início' },
       { tipo: 'comercial', area: 85, precoM2: 1250, pagamento: 'avista', momento: 'Intermediário' },

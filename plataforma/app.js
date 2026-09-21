@@ -14,7 +14,7 @@
                verdes: 0.1288136228480048, lazer: 0.10466942355263506, faixa: 14408, restricao: 0 },
       prazos: { preOp: 18, nFases: 1 },
       produtos: [
-        { tipo: 'residencial', area: 391.406, precoM2: 1250, pagamento: 'planos', momento: 'Intermediário' },
+        { tipo: 'residencial', area: 391.406, precoM2: 1250, pagamento: 'mix', momento: 'Intermediário' },
         { tipo: 'comercial', area: 800, precoM2: 1250, pagamento: 'avista', momento: 'Intermediário' },
         { tipo: 'comercial', area: 85, precoM2: 1250, pagamento: 'avista', momento: 'Início' },
         { tipo: 'comercial', area: 85, precoM2: 1250, pagamento: 'avista', momento: 'Intermediário' },
@@ -192,7 +192,9 @@
     if (tipo === 'sel') {
       el = e('select', { id: 'c_' + caminho });
       (opts.opcoes || []).forEach(function (o) {
-        el.appendChild(e('option', { value: o, txt: o, selected: o === v ? 'selected' : null }));
+        var valor = Array.isArray(o) ? o[0] : o, rotulo = Array.isArray(o) ? o[1] : o;
+        el.appendChild(e('option', { value: valor, txt: rotulo,
+                                     selected: valor === v ? 'selected' : null }));
       });
     } else if (tipo === 'txt') {
       el = e('input', { id: 'c_' + caminho, type: 'text', value: v == null ? '' : v });
@@ -322,7 +324,31 @@
         'Cada fase tem obra, lançamento e curva de vendas próprios. As fases inativas não entram em nada.')
     ]));
 
-    /* 3 — produtos: residenciais e comerciais no mesmo quadro */
+    function opcoesPagamento() {
+      var o = [['mix', 'Mix dos planos'], ['avista', 'À vista (tabela)']];
+      P.planos.forEach(function (pl, i) {
+        var q = Math.round(+pl.n || 0);
+        if (q < 1) return;
+        o.push(['p' + (i + 1), 'Plano ' + (i + 1) + (q > 1 ? ' · ' + q + 'x' : ' · à vista')]);
+      });
+      return o;
+    }
+
+    /* 3 — planos de venda: definem como cada produto recebe */
+    var colPlanos = ['À vista', 'Plano 2', 'Plano 3', 'Plano 4', 'Plano 5'];
+    var idx = [0, 1, 2, 3, 4];
+    f.appendChild(quadro('Planos de venda', 'condições de recebimento', [grade(colPlanos, [
+      { rot: 'Nº de parcelas', cels: idx.map(function (i) { return inp('planos.' + i + '.n', 'num', { step: 1 }); }) },
+      { rot: '% das unidades no mix', cels: idx.map(function (i) { return inp('planos.' + i + '.mix', 'pct'); }) },
+      { rot: '% de entrada', cels: idx.map(function (i) { return inp('planos.' + i + '.entrada', 'pct'); }) },
+      { rot: 'Desconto à vista (%)', cels: idx.map(function (i) { return inp('planos.' + i + '.desconto', 'pct'); }) },
+      { rot: 'Correção do preço (% a.a.)', cels: idx.map(function (i) { return inp('planos.' + i + '.correcao', 'pct'); }) },
+      { rot: 'Juros acima do IPCA (% a.a.)', cels: idx.map(function (i) { return inp('planos.' + i + '.jurosReal', 'pct'); }) },
+      { rot: 'Juros nominal equivalente', forte: true, cels: idx.map(function (i) {
+          return calc(function (r) { return r.planosProduto[0][i].n > 1 ? pc(r.planosProduto[0][i].jurosNominal, 2) : '—'; }); }) }
+    ], 'O mix distribui as unidades entre os planos e só vale para os produtos marcados como "mix dos planos" no quadro seguinte — na prática, os residenciais. Um produto que aponte para um plano específico vende 100% das suas unidades naquele plano, e o mix não o afeta. O plano à vista precisa ter 100% de entrada: não existe linha de recebimento de parcelas para ele. A parcela é fixa em moeda nominal, calculada pela Price sobre o preço-base e corrigida pelo fator do mês da venda.')]));
+
+    /* 4 — produtos: residenciais e comerciais no mesmo quadro */
     var colProd = [1, 2, 3, 4, 5].map(function (i) { return 'Produto ' + i; });
     var idxP = [0, 1, 2, 3, 4];
     f.appendChild(quadro('Produtos', 'o tipo define como vende; o pagamento define como recebe', [grade(colProd, [
@@ -330,10 +356,10 @@
           return inp('produtos.' + i + '.tipo', 'sel', { opcoes: ['residencial', 'comercial'], remonta: true }); }) },
       { rot: 'Área do lote (m²)', cels: idxP.map(function (i) { return inp('produtos.' + i + '.area', 'num'); }) },
       { rot: 'Preço de venda (R$/m²)', cels: idxP.map(function (i) { return inp('produtos.' + i + '.precoM2', 'num'); }) },
-      { rot: 'Preço do lote (R$)', forte: true, cels: idxP.map(function (i) {
+      { rot: 'Preço do lote (R$)', cels: idxP.map(function (i) {
           return calc(function (r) { return r.prog.prods[i].precoLote ? n(r.prog.prods[i].precoLote, 0) : '—'; }); }) },
       { rot: 'Forma de pagamento', cels: idxP.map(function (i) {
-          return inp('produtos.' + i + '.pagamento', 'sel', { opcoes: ['planos', 'avista'] }); }) },
+          return inp('produtos.' + i + '.pagamento', 'sel', { opcoes: opcoesPagamento() }); }) },
       { rot: 'Mês da venda (comercial)', cels: idxP.map(function (i) {
           return P.produtos[i].tipo === 'comercial'
             ? inp('produtos.' + i + '.momento', 'sel', { opcoes: ['Início', 'Intermediário', 'Fim'] })
@@ -346,9 +372,11 @@
           return calc(function (r) {
             var p = r.produtos[i];
             if (p.tipo !== 'comercial') return '—';
-            return p.meses.length ? p.meses.map(function (m) { return 'F' + m.fase + ': ' + m.mes; }).join(' · ') : '—';
+            return p.meses.length
+              ? p.meses.map(function (m) { return 'Fase ' + m.fase + ': mês ' + m.mes; }).join(' · ')
+              : '—';
           }, 'fraco'); }) }
-    ], 'Residencial vende ao longo das três janelas da fase; comercial é negociado em um único mês — Início é o lançamento da fase, Intermediário a entrega da obra e Fim o último mês de vendas. A forma de pagamento é livre para os dois: "planos" usa o mix de planos de venda; "avista" recebe tudo no ato, sem desconto.')]));
+    ], 'Residencial vende ao longo das três janelas da fase; comercial é negociado em um único mês — Início é o lançamento da fase, Intermediário a entrega da obra e Fim o último mês de vendas. A forma de pagamento é livre para os dois: "mix dos planos" distribui as unidades conforme o quadro acima; "à vista, sem desconto" recebe tudo no ato pelo preço de tabela — é o usual do lote comercial; ou aponte um plano específico, e todas as unidades do produto vendem naquele plano.')]));
 
     /* 4 — quadro de fases */
     var colFases = ['Fase 1', 'Fase 2', 'Fase 3', 'Fase 4'];
@@ -389,20 +417,6 @@
       reg('Preço médio por lote', [calc(function (r) { return R$(r.ind.precoMedioLote); })]),
       reg('Preço médio por m² de ALV', [calc(function (r) { return R$(r.ind.precoMedioM2, 2); })])
     ]));
-
-    /* 7 — planos de venda */
-    var colPlanos = ['À vista', 'Plano 2', 'Plano 3', 'Plano 4', 'Plano 5'];
-    var idx = [0, 1, 2, 3, 4];
-    f.appendChild(quadro('Planos de venda', 'mix precisa somar 100%', [grade(colPlanos, [
-      { rot: 'Nº de parcelas', cels: idx.map(function (i) { return inp('planos.' + i + '.n', 'num', { step: 1 }); }) },
-      { rot: '% das unidades (mix)', cels: idx.map(function (i) { return inp('planos.' + i + '.mix', 'pct'); }) },
-      { rot: '% de entrada', cels: idx.map(function (i) { return inp('planos.' + i + '.entrada', 'pct'); }) },
-      { rot: 'Desconto à vista (%)', cels: idx.map(function (i) { return inp('planos.' + i + '.desconto', 'pct'); }) },
-      { rot: 'Correção do preço (% a.a.)', cels: idx.map(function (i) { return inp('planos.' + i + '.correcao', 'pct'); }) },
-      { rot: 'Juros acima do IPCA (% a.a.)', cels: idx.map(function (i) { return inp('planos.' + i + '.jurosReal', 'pct'); }) },
-      { rot: 'Juros nominal equivalente', forte: true, cels: idx.map(function (i) {
-          return calc(function (r) { return r.planosProduto[0][i].n > 1 ? pc(r.planosProduto[0][i].jurosNominal, 2) : '—'; }); }) }
-    ], 'O plano à vista precisa ter 100% de entrada: não existe linha de recebimento de parcelas para ele. A parcela é fixa em moeda nominal, calculada pela Price sobre o preço-base e corrigida pelo fator do mês da venda.')]));
 
     /* 8 — custos */
     var c = [];
@@ -1083,6 +1097,10 @@
             });
             delete p.residenciais; delete p.comerciais;
           }
+          (p.produtos || []).forEach(function (x) {
+            if (x.pagamento === 'planos') x.pagamento = 'mix';
+            if (!/^(mix|avista|p[1-5])$/.test(x.pagamento)) x.pagamento = 'mix';
+          });
           if (p.produtos) P = p;
         }
       }

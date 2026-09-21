@@ -79,7 +79,8 @@
     var prods = P.produtos.map(function (p, i) {
       var tipo = p.tipo === 'comercial' ? 'comercial' : 'residencial';
       return { n: i + 1, tipo: tipo, area: num(p.area), precoM2: num(p.precoM2),
-               pagamento: p.pagamento === 'avista' ? 'avista' : 'planos',
+               pagamento: /^(mix|avista|p[1-5])$/.test(p.pagamento) ? p.pagamento
+                          : (p.pagamento === 'avista' ? 'avista' : 'mix'),
                momento: p.momento || 'Intermediário',
                precoLote: num(p.area) * num(p.precoM2) };
     });
@@ -203,14 +204,18 @@
     });
     function def(m) { return Math.pow(1 + ipca, -m / 12); }
 
-    function vender(qtd, precoLote, m, fase, soVista, comercial) {
+    /* modo: 'mix' distribui pelo mix dos planos; 'avista' vende tudo no ato a
+       preço de tabela, sem desconto; 'p1'..'p5' põem 100% das unidades em um
+       plano específico, com as condições daquele plano. */
+    function vender(qtd, precoLote, m, fase, modo, comercial) {
       if (qtd <= 0 || m < 0 || m >= N) return;
       var porTipo = comercial ? recCom : recRes;
+      var fixo = /^p[1-5]$/.test(modo) ? parseInt(modo.slice(1), 10) - 1 : -1;
       for (var k = 0; k < planos.length; k++) {
         var pl = planos[k];
-        var mix = soVista ? (k === 0 ? 1 : 0) : pl.mix;
+        var mix = modo === 'mix' ? pl.mix : (fixo >= 0 ? (k === fixo ? 1 : 0) : (k === 0 ? 1 : 0));
         if (mix <= 0 || pl.n < 1) continue;
-        var desconto = soVista ? 0 : pl.desconto;   // lote comercial sai a preço de tabela
+        var desconto = modo === 'avista' ? 0 : pl.desconto;
         var corr = Math.pow(1 + pl.correcao, m / 12);
         var valor = qtd * mix * precoLote * (1 - desconto) * corr;
         vgvVendido[m] += valor * def(m);
@@ -229,9 +234,9 @@
     }
     for (var f = 0; f < cron.fases.length; f++) {
       for (var p = 0; p < prog.prods.length; p++) {
-        var pr = prog.prods[p], serie = cron.vendas[f][p], avista = pr.pagamento === 'avista';
+        var pr = prog.prods[p], serie = cron.vendas[f][p];
         for (var m = 0; m < N; m++) if (serie[m] > 0)
-          vender(serie[m], pr.precoLote, m, f, avista, pr.tipo === 'comercial');
+          vender(serie[m], pr.precoLote, m, f, pr.pagamento, pr.tipo === 'comercial');
       }
     }
     var ultimo = 0;
@@ -513,6 +518,10 @@
       { ok: Math.abs(P.planos.reduce(function (s, p) { return s + num(p.mix); }, 0) - 1) < 0.0001,
         txt: 'O mix dos planos de venda soma 100%' },
       { ok: num(P.planos[0].entrada) === 1, txt: 'O plano à vista tem 100% de entrada' },
+      { ok: !prog.prods.some(function (p, i) {
+              return p.pagamento === 'mix' && P.quadro[i].some(function (q) { return num(q) > 0; });
+            }) || Math.abs(P.planos.reduce(function (s2, p2) { return s2 + num(p2.mix); }, 0) - 1) < 0.0001,
+        txt: 'Há produtos no mix e o mix está fechado' },
       { ok: P.fases.slice(0, prog.nFases).every(function (f) {
           return num(f.etapa1) + num(f.etapa2) + num(f.etapa3) <= 1; }),
         txt: 'As etapas 1 a 3 da curva de obra não passam de 100%' },
