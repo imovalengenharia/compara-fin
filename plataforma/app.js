@@ -14,8 +14,8 @@
          sugestões da plataforma, escritas em letra clara até o avaliador
          informar as suas. APP e faixa vêm do levantamento, não do modelo. */
       areas: { tipo: 'aberto', gleba: 160084,
-               aberto:     { circulacao: 0.20, verdeLazer: 0.10, institucional: 0.05 },
-               condominio: { circulacao: 0.15, verdeLazer: 0.10, institucional: 0.05 },
+               aberto:     { circulacao: null, verdeLazer: null, institucional: null },
+               condominio: { circulacao: null, verdeLazer: null, institucional: null },
                app: 0.1288136228480048, faixa: 14408, restricao: 0 },
       prazos: { preOp: 18, nFases: 1 },
       produtos: [
@@ -118,10 +118,18 @@
     }
   }
 
-  function marcarSugerido(el, valor) {
-    if (el.dataset.sugerido === undefined) return;
-    var igual = Math.abs((+valor || 0) - (+el.dataset.sugerido || 0)) < 1e-9;
-    el.classList.toggle('sugerido', igual);
+  function semValor(v) { return v === null || v === undefined || v === ''; }
+  /* Enquanto a premissa não for informada, o campo mostra o número sugerido
+     em letra clara e o modelo calcula com ele. Digitar um valor — ainda que
+     igual ao sugerido — torna a premissa sua, e a letra fica cheia. Apagar o
+     campo devolve a sugestão. */
+  function mostrarSugerido(el, caminho, tipo, inteiro) {
+    var sug = el.dataset.sugerido, g = pegar(caminho);
+    var usa = sug !== undefined && semValor(g);
+    var v = usa ? +sug : g;
+    el.value = porNum(tipo === 'pct' ? (v || 0) * 100 : v, inteiro);
+    el.classList.toggle('sugerido', usa);
+    marcarVazio(el);
   }
 
   /* Reescreve o campo já formatado mantendo o cursor depois dos mesmos dígitos */
@@ -165,9 +173,10 @@
     var a = P.areas, G = +a.gleba || 0, perdas = 0;
     Motor.destinos(P).forEach(function (d) {
       var i = d.chave.indexOf('.'), v;
-      if (i < 0) v = +a[d.chave] || 0;
-      else { var g = a[d.chave.slice(0, i)]; v = g ? (+g[d.chave.slice(i + 1)] || 0) : 0; }
-      perdas += d.modo === 'pct' ? v * G : v;
+      if (i < 0) v = a[d.chave];
+      else { var g = a[d.chave.slice(0, i)]; v = g ? g[d.chave.slice(i + 1)] : undefined; }
+      if (v === null || v === undefined || v === '') v = d.usual || 0;
+      perdas += d.modo === 'pct' ? (+v || 0) * G : (+v || 0);
     });
     return G - perdas;
   }
@@ -299,16 +308,22 @@
     if (t === 'sel' || t === 'txt') v = el.value;
     else {
       reformatar(el);
-      v = lerNum(el.value);
-      if (t === 'pct') v = v / 100;
-      var lim = null;
-      if (el.dataset.max !== undefined && v > +el.dataset.max) lim = +el.dataset.max;
-      if (ev.type === 'change' && el.dataset.min !== undefined && v < +el.dataset.min) lim = +el.dataset.min;
-      if (lim !== null) { v = lim; el.value = porNum(t === 'pct' ? v * 100 : v, el.dataset.inteiro === '1'); }
+      var texto = el.value.trim();
+      if (el.dataset.sugerido !== undefined && (texto === '' || texto === VAZIO)) {
+        v = null;                       /* sem valor: volta a valer a sugestão */
+        el.classList.add('sugerido');
+      } else {
+        v = lerNum(el.value);
+        if (t === 'pct') v = v / 100;
+        var lim = null;
+        if (el.dataset.max !== undefined && v > +el.dataset.max) lim = +el.dataset.max;
+        if (ev.type === 'change' && el.dataset.min !== undefined && v < +el.dataset.min) lim = +el.dataset.min;
+        if (lim !== null) { v = lim; el.value = porNum(t === 'pct' ? v * 100 : v, el.dataset.inteiro === '1'); }
+        el.classList.remove('sugerido');
+      }
     }
     var excessoAntes = excessoALV();
     guardar(c, v);
-    marcarSugerido(el, v);
     marcarVazio(el);
     travarALV(el, c);
     /* a gleba mudou e o programa não cabe mais: a edição vale, o aviso explica */
@@ -339,18 +354,13 @@
     } else if (tipo === 'txt') {
       el = e('input', { id: 'c_' + caminho, type: 'text', value: v == null ? '' : v });
     } else {
-      if (tipo === 'pct') v = (v || 0) * 100;
       var inteiro = opts.step === 1;
       el = e('input', { id: 'c_' + caminho, type: 'text', cls: 'num',
                         inputmode: inteiro ? 'numeric' : 'decimal',
-                        autocomplete: 'off', spellcheck: 'false',
-                        value: porNum(v, inteiro) });
+                        autocomplete: 'off', spellcheck: 'false' });
       if (inteiro) el.dataset.inteiro = '1';
-      if (opts.sugerido !== undefined && opts.sugerido !== null) {
-        el.dataset.sugerido = opts.sugerido;
-        marcarSugerido(el, pegar(caminho));
-      }
-      setTimeout(function () { marcarVazio(el); }, 0);
+      if (opts.sugerido !== undefined && opts.sugerido !== null) el.dataset.sugerido = opts.sugerido;
+      mostrarSugerido(el, caminho, tipo, inteiro);
       if (opts.min !== undefined) el.dataset.min = opts.min;
       if (opts.max !== undefined) el.dataset.max = opts.max;
       /* a tecla "." vira vírgula: dentro do campo o ponto é sempre milhar */
@@ -364,17 +374,13 @@
         try { el.setSelectionRange(a + 1, a + 1); } catch (err) {}
         el.dispatchEvent(new Event('input', { bubbles: true }));
       });
-      /* ao entrar, o travessão sai da frente para não atrapalhar a digitação */
+      /* ao entrar, o travessão e o número sugerido saem da frente */
       el.addEventListener('focus', function () {
-        if (el.value === VAZIO) el.value = '';
+        if (el.value === VAZIO || el.classList.contains('sugerido')) el.value = '';
         marcarVazio(el);
       });
-      /* ao sair, mostra o valor que ficou guardado, já normalizado */
-      el.addEventListener('blur', function () {
-        var g = pegar(caminho);
-        el.value = porNum(tipo === 'pct' ? (g || 0) * 100 : g, inteiro);
-        marcarVazio(el);
-      });
+      /* ao sair, mostra o que ficou guardado — ou a sugestão, se nada ficou */
+      el.addEventListener('blur', function () { mostrarSugerido(el, caminho, tipo, inteiro); });
     }
     el.dataset.caminho = caminho; el.dataset.tipo = tipo;
     if (opts.remonta) el.dataset.remonta = '1';

@@ -93,11 +93,14 @@
     });
     return lista.map(function (d, i) { d.n = i + 2; d.rotuloN = (i + 2) + ' · ' + d.rotulo; return d; });
   }
+  /* Premissa não informada vale o percentual usual da modalidade: a sugestão
+     não é enfeite de tela, entra na conta como qualquer outra premissa. */
   function valorDestino(a, d) {
-    var i = d.chave.indexOf('.');
-    if (i < 0) return num(a[d.chave]);
-    var grupo = a[d.chave.slice(0, i)];
-    return grupo ? num(grupo[d.chave.slice(i + 1)]) : 0;
+    var i = d.chave.indexOf('.'), v;
+    if (i < 0) v = a[d.chave];
+    else { var grupo = a[d.chave.slice(0, i)]; v = grupo ? grupo[d.chave.slice(i + 1)] : undefined; }
+    if (v === null || v === undefined || v === '') return d.usual === undefined ? 0 : d.usual;
+    return num(v);
   }
   function quadroAreas(P) {
     var a = P.areas, G = num(a.gleba);
