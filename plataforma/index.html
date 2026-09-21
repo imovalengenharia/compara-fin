@@ -18,7 +18,7 @@
   --campo-bg:#1A2027; --campo-borda:#303945; --campo-foco:#C2A878;
   --pos:#6FB08C; --neg:#D98A63; --warn:#C2A878; --aviso-bg:#20191055;
   --sombra:0 1px 2px rgba(0,0,0,.35);
-  --rot:296px; --campo:132px; --comp:176px; --uni:38px; --gap:12px; --dentro:8px;
+  --rot:296px; --campo:132px; --comp:176px; --uni:38px; --gap:24px; --dentro:8px;
   /* uma altura de linha e seis tamanhos de letra governam a plataforma
      inteira — só o fluxo de caixa, por ser denso, tem escala própria */
   --linha:34px; --alt:28px; --lh:1.45; --sufixo:21px; --prefixo:25px;
@@ -77,7 +77,7 @@ button{font:inherit;color:inherit}
 .aba:focus-visible{outline:2px solid var(--acento);outline-offset:-2px}
 
 /* ---------- folha ---------- */
-.folha{padding:18px 20px 60px;max-width:1520px;margin:0 auto}
+.folha{padding:18px 20px 60px;max-width:1680px;margin:0 auto}
 .folha-topo{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}
 .folha-topo:empty{display:none}
 .selo{font-size:var(--t-cab);letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;border-radius:3px;
@@ -115,11 +115,11 @@ details.quadro>summary:focus-visible{outline:2px solid var(--acento);outline-off
 .reg>.livre>*{width:auto}
 .reg.forte>.rot{font-weight:600;color:var(--ink)}
 .reg.forte>.val,.reg.forte>.comp{font-weight:600;color:var(--ink)}
-@media (max-width:1400px){
-  :root{--rot:264px;--comp:118px}
+@media (max-width:1560px){
+  :root{--rot:264px;--comp:150px;--gap:18px}
 }
 @media (max-width:1100px){
-  :root{--rot:200px;--campo:118px;--comp:118px}
+  :root{--rot:200px;--campo:118px;--comp:118px;--gap:12px}
   .reg{grid-template-columns:minmax(0,1fr) var(--campo) 30px;gap:0 8px}
   .reg>.comp{grid-column:2/4}
   .reg>.nota{grid-column:1/-1;padding-bottom:4px}

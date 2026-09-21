@@ -654,7 +654,7 @@
           : 'Informado: você trava o que está sendo pago pela terra e o modelo devolve a TIR que sobra.'),
       reg('Forma de pagamento', [inp('terreno.forma', 'sel',
         { opcoes: ['permuta', 'avista', 'misto'], remonta: true })],
-        'Permuta: percentual da receita líquida mensal. À vista: desembolso em dinheiro no cronograma abaixo. Misto: parte em cada um.')
+        'Permuta: percentual da receita líquida. À vista: dinheiro no cronograma abaixo. Misto: parte em cada um.')
     ];
     if (forma === 'misto') linhasTerreno.push(reg('Parcela paga em dinheiro',
       [inp('terreno.pctDinheiro', 'pct'), un('%')],
