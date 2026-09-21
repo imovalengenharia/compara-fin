@@ -21,7 +21,7 @@
   --rot:296px; --campo:132px; --comp:176px; --uni:38px; --gap:12px; --dentro:8px;
   /* uma altura de linha e seis tamanhos de letra governam a plataforma
      inteira — só o fluxo de caixa, por ser denso, tem escala própria */
-  --linha:34px; --alt:28px; --lh:1.45;
+  --linha:34px; --alt:28px; --lh:1.45; --sufixo:15px;
   --t-tit:12.5px; --t-rot:12.5px; --t-val:12.5px;
   --t-uni:11.5px; --t-nota:11.5px; --t-cab:10.5px;
   --sans:'IBM Plex Sans',system-ui,sans-serif;
@@ -105,11 +105,11 @@ details.quadro>summary:focus-visible{outline:2px solid var(--acento);outline-off
 .reg:last-child{border-bottom:none}
 .reg>.rot{font-size:var(--t-rot);color:var(--ink2);line-height:var(--lh)}
 .reg>.val{display:flex;justify-content:flex-end;align-items:center}
-.reg.amplo>.val{grid-column:2/4}
 .reg>.val>*{width:100%}
 .reg>.uni{font-size:var(--t-uni);color:var(--muted);white-space:nowrap}
 .reg>.comp{font-size:var(--t-val);color:var(--muted);font-family:var(--mono);text-align:right;
-  padding-right:calc(var(--dentro) + 1px);font-variant-numeric:tabular-nums;white-space:nowrap}
+  padding-right:calc(var(--dentro) + var(--sufixo) + 1px);font-variant-numeric:tabular-nums;
+  white-space:nowrap}
 .reg>.nota{font-size:var(--t-nota);color:var(--muted);line-height:var(--lh)}
 .reg>.livre{grid-column:2/5;display:flex;justify-content:flex-end;align-items:center;gap:7px}
 .reg>.livre>*{width:auto}
@@ -130,17 +130,27 @@ details.quadro>summary:focus-visible{outline:2px solid var(--acento);outline-off
 input,select{font:inherit;font-family:var(--mono);font-size:var(--t-val);background:var(--campo-bg);
   border:1px solid var(--campo-borda);border-radius:3px;padding:4px var(--dentro);text-align:right;
   color:var(--ink);width:var(--campo);max-width:100%;min-width:0;height:var(--alt);line-height:1.2}
+/* todo campo numérico guarda a mesma folga à direita; nos percentuais ela
+   recebe o sinal, de modo que os dígitos caem sempre na mesma coluna */
+input.num{padding-right:calc(var(--dentro) + var(--sufixo))}
+.campo{position:relative;display:inline-block;width:var(--campo);max-width:100%;vertical-align:middle}
+.campo>input{width:100%}
+.campo>.sufixo{position:absolute;right:var(--dentro);top:0;height:var(--alt);display:flex;
+  align-items:center;font-family:var(--mono);font-size:var(--t-val);color:var(--muted);
+  pointer-events:none}
+.campo>input:disabled+.sufixo{color:var(--muted);opacity:.7}
 select{font-family:var(--sans);text-align:left}
 input[type=text]{font-family:var(--sans);text-align:left}
 input.num{font-family:var(--mono);text-align:right}
 input.limitado{border-color:var(--warn);background:var(--aviso-bg)}
-.reg>.val>input,.reg>.val>select{width:100%}
+.reg>.val>input,.reg>.val>select,.reg>.val>.campo{width:100%}
 input:focus,select:focus{outline:2px solid var(--campo-foco);outline-offset:-1px}
-input:disabled{background:var(--rule-soft);border-color:var(--rule);color:var(--muted)}
+input:disabled{background:transparent;border-color:var(--rule-soft);color:var(--muted);
+  opacity:.7;cursor:default}
 .un{font-size:var(--t-uni);color:var(--muted);white-space:nowrap}
 /* o recuo faz os dígitos calculados caírem na mesma coluna dos digitados */
 .calc{font-family:var(--mono);font-size:var(--t-val);text-align:right;color:var(--ink);
-  padding-right:calc(var(--dentro) + 1px);font-variant-numeric:tabular-nums}
+  padding-right:calc(var(--dentro) + var(--sufixo) + 1px);font-variant-numeric:tabular-nums}
 .reg>.val>.calc{display:block;width:100%}
 .calc.fraco{color:var(--muted)}
 
@@ -151,13 +161,13 @@ table.grade th,table.grade td{width:calc(var(--campo) + var(--gap));padding:3px 
 table.grade th:first-child,table.grade td:first-child{width:var(--rot);padding-left:0;text-align:left}
 table.grade th:last-child,table.grade td:last-child{width:auto;padding:0}
 table.grade th{font-weight:500;font-size:var(--t-cab);letter-spacing:.07em;text-transform:uppercase;
-  color:var(--muted);padding-right:calc(var(--dentro) + 1px);
+  color:var(--muted);padding-right:calc(var(--dentro) + var(--sufixo) + 1px);
   border-bottom:1px solid var(--rule)}
 table.grade th:first-child,table.grade th:last-child{padding-right:0}
 table.grade td{border-bottom:1px solid var(--rule-soft)}
 table.grade td:first-child{color:var(--ink2)}
-table.grade td>input,table.grade td>select,table.grade td>.calc{width:var(--campo);
-  display:inline-block;text-align:right;vertical-align:middle}
+table.grade td>input,table.grade td>select,table.grade td>.calc,table.grade td>.campo{
+  width:var(--campo);display:inline-block;text-align:right;vertical-align:middle}
 table.grade tr.forte td{font-weight:600;color:var(--ink);border-top:1px solid var(--rule)}
 .nota-linha{font-size:var(--t-nota);color:var(--muted);line-height:var(--lh)}
 .nota-bloco{font-size:var(--t-nota);color:var(--muted);padding:8px 0 2px;line-height:var(--lh);max-width:118ch}

@@ -336,7 +336,10 @@
     if (opts.off) el.disabled = true;
     el.addEventListener('input', aoDigitar);
     el.addEventListener('change', aoDigitar);
-    return el;
+    if (tipo !== 'pct') return el;
+    /* percentual carrega o sinal dentro do próprio campo */
+    var caixa = e('span', { cls: 'campo pct' }, [el, e('span', { cls: 'sufixo', txt: '%' })]);
+    return caixa;
   }
 
   /* valor calculado: registra-se para ser atualizado a cada recálculo */
@@ -351,16 +354,18 @@
   function reg(rot, celulas, nota, forte) {
     celulas = (celulas || []).filter(Boolean);
     var temUn = celulas[1] && celulas[1].className === 'un';
-    /* uma lista sem unidade ocupa também a coluna da unidade: o rótulo da
-       opção é texto e não cabe na largura de um campo numérico */
-    var amplo = !temUn && celulas[0] && celulas[0].tagName === 'SELECT';
-    var linha = e('div', { cls: 'reg' + (forte ? ' forte' : '') + (amplo ? ' amplo' : '') },
+    if (temUn && celulas[0] && celulas[0].classList && celulas[0].classList.contains('pct')) {
+      var u = celulas[1].textContent;
+      if (u === '%') { celulas.splice(1, 1); temUn = false; }
+      else if (u.slice(0, 2) === '% ') celulas[1].textContent = u.slice(2);
+    }
+    var linha = e('div', { cls: 'reg' + (forte ? ' forte' : '') },
       [e('div', { cls: 'rot', txt: rot })]);
     if (celulas.length > 3) {
       linha.appendChild(e('div', { cls: 'livre' }, celulas));
     } else {
       linha.appendChild(e('div', { cls: 'val' }, celulas[0] ? [celulas[0]] : []));
-      if (!amplo) linha.appendChild(e('div', { cls: 'uni' }, temUn ? [celulas[1]] : []));
+      linha.appendChild(e('div', { cls: 'uni' }, temUn ? [celulas[1]] : []));
       var comp = temUn ? celulas[2] : celulas[1];
       linha.appendChild(e('div', { cls: 'comp' }, comp ? [comp] : []));
     }
@@ -415,7 +420,7 @@
     var areas = [
       reg('Modalidade de parcelamento',
         [inp('areas.tipo', 'sel', { remonta: true,
-          opcoes: [['aberto', MOD.aberto.rotulo], ['condominio', MOD.condominio.rotulo]] })],
+          opcoes: [['aberto', MOD.aberto.curto], ['condominio', MOD.condominio.curto]] })],
         modal.chave === 'aberto'
           ? 'As áreas públicas são doadas ao município e os lotes têm acesso por via pública.'
           : 'Vias, lazer e apoio permanecem privados, em fração ideal dos condôminos.'),
@@ -468,15 +473,18 @@
     var colPlanos = ['À vista', 'Plano 2', 'Plano 3', 'Plano 4', 'Plano 5'];
     var idx = [0, 1, 2, 3, 4];
     f.appendChild(quadro('Planos de venda', 'condições de recebimento', [grade(colPlanos, [
-      { rot: 'Nº de parcelas', cels: idx.map(function (i) { return inp('planos.' + i + '.n', 'num', { step: 1 }); }) },
-      { rot: '% das unidades no mix', cels: idx.map(function (i) { return inp('planos.' + i + '.mix', 'pct'); }) },
-      { rot: '% de entrada', cels: idx.map(function (i) { return inp('planos.' + i + '.entrada', 'pct'); }) },
-      { rot: 'Desconto à vista (%)', cels: idx.map(function (i) { return inp('planos.' + i + '.desconto', 'pct'); }) },
-      { rot: 'Correção do preço (% a.a.)', cels: idx.map(function (i) { return inp('planos.' + i + '.correcao', 'pct'); }) },
-      { rot: 'Juros acima do IPCA (% a.a.)', cels: idx.map(function (i) { return inp('planos.' + i + '.jurosReal', 'pct'); }) },
+      { rot: 'Nº de parcelas', cels: idx.map(function (i) {
+          return inp('planos.' + i + '.n', 'num', { step: 1, off: i === 0 }); }) },
+      { rot: 'Unidades sob o total (apenas residenciais)',
+        cels: idx.map(function (i) { return inp('planos.' + i + '.mix', 'pct'); }) },
+      { rot: 'Entrada', cels: idx.map(function (i) {
+          return inp('planos.' + i + '.entrada', 'pct', { off: i === 0 }); }) },
+      { rot: 'Desconto à vista', cels: idx.map(function (i) { return inp('planos.' + i + '.desconto', 'pct'); }) },
+      { rot: 'Correção do preço (a.a.)', cels: idx.map(function (i) { return inp('planos.' + i + '.correcao', 'pct'); }) },
+      { rot: 'Juros acima do IPCA (a.a.)', cels: idx.map(function (i) { return inp('planos.' + i + '.jurosReal', 'pct'); }) },
       { rot: 'Juros nominal equivalente', forte: true, cels: idx.map(function (i) {
           return calc(function (r) { return r.planosProduto[0][i].n > 1 ? pc(r.planosProduto[0][i].jurosNominal, 2) : '—'; }); }) }
-    ], 'O mix distribui as unidades entre os planos e só vale para os produtos marcados como "mix dos planos" no quadro seguinte — na prática, os residenciais. Um produto que aponte para um plano específico vende 100% das suas unidades naquele plano, e o mix não o afeta. O plano à vista precisa ter 100% de entrada: não existe linha de recebimento de parcelas para ele. A parcela é fixa em moeda nominal, calculada pela Price sobre o preço-base e corrigida pelo fator do mês da venda.')]));
+    ], 'O rateio das unidades distribui o programa entre os planos e só vale para os produtos marcados como "mix dos planos" no quadro seguinte — na prática, os residenciais. Um produto que aponte para um plano específico vende 100% das suas unidades naquele plano, e o rateio não o afeta. No plano à vista, uma parcela e 100% de entrada são definição, não escolha: por isso os dois campos vêm travados. A parcela é fixa em moeda nominal, calculada pela Price sobre o preço-base e corrigida pelo fator do mês da venda.')]));
 
     /* 4 — produtos: residenciais e comerciais no mesmo quadro */
     var colProd = [1, 2, 3, 4, 5].map(function (i) { return 'Produto ' + i; });
@@ -1194,6 +1202,8 @@
               condominio: { circulacao: .15, verdeLazer: .10, institucional: .05 },
               app: p.areas.verdes || 0, faixa: p.areas.faixa || 0, restricao: p.areas.restricao || 0 };
           }
+          /* o plano à vista é definição: uma parcela, 100% de entrada */
+          if (p.planos && p.planos[0]) { p.planos[0].n = 1; p.planos[0].entrada = 1; }
           if (!p.areas.aberto) p.areas.aberto = { circulacao: .20, verdeLazer: .10, institucional: .05 };
           if (!p.areas.condominio) p.areas.condominio = { circulacao: .15, verdeLazer: .10, institucional: .05 };
           if (!p.terreno) p.terreno = { modo: (p.permuta && p.permuta.modo === 'fixo') ? 'informado' : 'resolver',

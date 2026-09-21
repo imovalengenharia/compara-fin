@@ -47,7 +47,7 @@
      não apaga o que foi digitado na outra. */
   var MODALIDADES = {
     aberto: {
-      chave: 'aberto', rotulo: 'Loteamento aberto',
+      chave: 'aberto', rotulo: 'Loteamento aberto', curto: 'Loteamento',
       destinos: [
         { chave: 'circulacao', rotulo: 'Sistema viário', usual: 0.20,
           nota: 'Ruas e calçadas do loteamento, doadas ao município. Usual de 20% da gleba.' },
@@ -58,7 +58,7 @@
       ]
     },
     condominio: {
-      chave: 'condominio', rotulo: 'Condomínio de lotes',
+      chave: 'condominio', rotulo: 'Condomínio de lotes', curto: 'Condomínio',
       destinos: [
         { chave: 'circulacao', rotulo: 'Circulação interna', usual: 0.15,
           nota: 'Vias internas do condomínio, que permanecem privadas. Usual de 15% da gleba.' },
