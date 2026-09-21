@@ -392,7 +392,7 @@
   function afixar(el, un) {
     var lado = AFIXOS[un];
     if (!lado || !el.classList.contains('num')) return el;
-    if (lado === 'prefixo') el.classList.add('com-prefixo');
+    el.classList.add(lado === 'prefixo' ? 'com-prefixo' : 'com-sufixo');
     var caixa = e('span', { cls: 'campo' }, [el, e('span', { cls: lado, txt: un })]);
     caixa.dataset.un = un;
     return caixa;
@@ -414,6 +414,7 @@
       num.textContent = m ? m[2] : t;
       suf.textContent = m && m[3] ? m[3] : '';
       el.classList.toggle('com-pre', !!(m && m[1]));
+      el.classList.toggle('com-suf', !!(m && m[3]));
       /* só o que é número guarda a folga do afixo à direita; texto usa a
          célula inteira, senão quebra linha à toa */
       el.classList.toggle('txt', !m && !/^[-\d—]/.test(t));

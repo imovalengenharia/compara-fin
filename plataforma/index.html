@@ -131,17 +131,18 @@ details.quadro>summary:focus-visible{outline:2px solid var(--acento);outline-off
 input,select{font:inherit;font-family:var(--mono);font-size:var(--t-val);background:var(--campo-bg);
   border:1px solid var(--campo-borda);border-radius:3px;padding:4px var(--dentro);text-align:right;
   color:var(--ink);width:var(--campo);max-width:100%;min-width:0;height:var(--alt);line-height:1.2}
-/* todo campo numérico guarda a mesma folga à direita; % e m² a ocupam, de
-   modo que os dígitos caem sempre na mesma coluna. R$ vai do lado esquerdo,
-   onde não disputa espaço com o número. */
-input.num{padding-right:calc(var(--dentro) + var(--sufixo))}
+/* o conteúdo encosta sempre na mesma borda; quem tem unidade à direita abre
+   a folga para ela, e só nesse caso os dígitos recuam. R$ vai do lado
+   esquerdo, onde não disputa espaço com o número. */
+input.num{padding-right:var(--dentro)}
+input.num.com-sufixo{padding-right:calc(var(--dentro) + var(--sufixo))}
 input.num.com-prefixo{padding-left:calc(var(--dentro) + var(--prefixo))}
 .campo{position:relative;display:inline-block;width:var(--campo);max-width:100%;vertical-align:middle}
 .campo>input{width:100%}
 .campo>.sufixo,.campo>.prefixo{position:absolute;top:0;height:var(--alt);display:flex;
   align-items:center;font-family:var(--mono);font-size:var(--t-val);color:var(--muted);
   pointer-events:none}
-.campo>.sufixo{right:var(--dentro)}
+.campo>.sufixo{right:calc(var(--dentro) + 1px)}
 .campo>.prefixo{left:var(--dentro)}
 .campo>input:disabled~.sufixo,.campo>input:disabled~.prefixo{opacity:.7}
 .campo.sem-afixo>.sufixo,.campo.sem-afixo>.prefixo{display:none}
@@ -159,9 +160,10 @@ input.sugerido{color:var(--muted)}
 .un{font-size:var(--t-uni);color:var(--muted);white-space:nowrap}
 /* o recuo faz os dígitos calculados caírem na mesma coluna dos digitados */
 .calc{font-family:var(--mono);font-size:var(--t-val);text-align:right;color:var(--ink);
-  padding-right:calc(var(--dentro) + var(--sufixo) + 1px);font-variant-numeric:tabular-nums}
+  padding-right:calc(var(--dentro) + 1px);font-variant-numeric:tabular-nums}
+.calc.com-suf{padding-right:calc(var(--dentro) + var(--sufixo) + 1px)}
 .reg>.val>.calc{display:block;width:100%}
-.calc.txt{padding-right:var(--dentro)}
+.calc.txt{padding-right:calc(var(--dentro) + 1px)}
 /* moeda e unidade do valor calculado ocupam as mesmas posições que ocupam
    dentro de um campo digitável — daí os dígitos alinharem entre os dois */
 .calc>.pre:empty,.calc>.suf:empty{display:none}
@@ -172,7 +174,7 @@ input.sugerido{color:var(--muted)}
 .reg>.val>.calc>.suf,table.grade td>.calc>.suf{position:absolute;top:0;height:100%;margin:0;
   display:flex;align-items:center}
 .reg>.val>.calc>.pre,table.grade td>.calc>.pre{left:var(--dentro);color:var(--muted)}
-.reg>.val>.calc>.suf,table.grade td>.calc>.suf{right:var(--dentro)}
+.reg>.val>.calc>.suf,table.grade td>.calc>.suf{right:calc(var(--dentro) + 1px)}
 /* a folga à esquerda cobre a moeda com um respiro; mais do que isso e um
    valor de oito dígitos não caberia entre ela e a folga do sufixo */
 .reg>.val>.calc.com-pre,table.grade td>.calc.com-pre{padding-left:calc(var(--dentro) + 17px)}
@@ -185,7 +187,7 @@ table.grade th,table.grade td{width:calc(var(--campo) + var(--gap));padding:3px 
 table.grade th:first-child,table.grade td:first-child{width:var(--rot);padding-left:0;text-align:left}
 table.grade th:last-child,table.grade td:last-child{width:auto;padding:0}
 table.grade th{font-weight:500;font-size:var(--t-cab);letter-spacing:.07em;text-transform:uppercase;
-  color:var(--muted);padding-right:calc(var(--dentro) + var(--sufixo) + 1px);
+  color:var(--muted);padding-right:calc(var(--dentro) + 1px);
   border-bottom:1px solid var(--rule)}
 table.grade th:first-child,table.grade th:last-child{padding-right:0}
 table.grade td{border-bottom:1px solid var(--rule-soft)}
