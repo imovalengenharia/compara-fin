@@ -35,10 +35,11 @@
                  velLanc: .2, velObra: [.6, .5, .5, .5][i], velPos: [.2, .3, .3, .3][i],
                  durPos: 12, gatilho: .7 };
       }),
-      custos: { impostos: .0673, comissoes: .045, contrapartidas: .025, outrosTerreno: .02,
-                obraM2: 300, obraPctVGV: 0, criterio: 'Critério 1', pctPreOp: .08, cga: .03,
-                gerenciamento: .06, manutencao: .01, marketing: .03, stand: .01,
-                gestaoComercial: .005, premiacao: .005, admVendas: .015, bancarias: .002 },
+      /* nulo = por informar: vale o usual de mercado, que o motor resolve */
+      custos: { impostos: null, comissoes: null, contrapartidas: null, outrosTerreno: null,
+                obraM2: null, obraPctVGV: null, criterio: 'Critério 1', pctPreOp: null, cga: null,
+                gerenciamento: null, manutencao: null, marketing: null, stand: null,
+                gestaoComercial: null, premiacao: null, admVendas: null, bancarias: null },
       financiamento: { pctFinanciado: 0, juros: 0, prazoAmortizacao: 0 },
       indices: { ipca: .035, incc: .065, cdi: .13, multiplo: 2 },
       janelas: { terrenoIni: 0, terrenoParc: 1, itbiIni: 1, itbiParc: 1, preOpIni: 1,
@@ -633,33 +634,37 @@
 
     /* 8 — custos */
     var c = [];
-    function custo(rot, caminho, tipo, nota, opts) { c.push(reg(rot, [inp(caminho, tipo, opts), un(tipo === 'pct' ? '%' : (opts && opts.un) || '')], nota)); }
-    custo('Impostos s/ vendas', 'custos.impostos', 'pct', 'Lucro presumido pelo regime de caixa, sobre a receita recebida.');
-    custo('Comissões s/ vendas', 'custos.comissoes', 'pct', 'Corretagem sobre o VGV vendido, reconhecida no mês da venda.');
-    custo('Contrapartidas', 'custos.contrapartidas', 'pct', 'Obras de interesse público exigidas na aprovação. % do VGV.');
-    custo('Outros custos com terreno', 'custos.outrosTerreno', 'pct', 'Registro, ITBI e diligências sobre o equivalente à vista da aquisição.');
+    function custo(rot, caminho, tipo, nota, opts) {
+      opts = opts || {};
+      if (Motor.USUAIS[caminho] !== undefined) opts.sugerido = Motor.USUAIS[caminho];
+      c.push(reg(rot, [inp(caminho, tipo, opts), un(tipo === 'pct' ? '%' : opts.un || '')], nota));
+    }
+    custo('Impostos s/ vendas', 'custos.impostos', 'pct', 'Lucro presumido no regime de caixa — PIS, COFINS, IRPJ e CSLL sobre a receita recebida. Usual de 6,73%; com patrimônio de afetação no RET, 4%.');
+    custo('Comissões s/ vendas', 'custos.comissoes', 'pct', 'Corretagem sobre o VGV vendido, reconhecida no mês da venda. Usual entre 4% e 6% no loteamento.');
+    custo('Contrapartidas', 'custos.contrapartidas', 'pct', 'Obras de interesse público exigidas na aprovação, sobre o VGV. Varia com o município; usual até 3%.');
+    custo('Outros custos com terreno', 'custos.outrosTerreno', 'pct', 'ITBI, registro e diligências sobre o equivalente à vista da aquisição. Só o ITBI já costuma ser 2%; some o registro.');
     c.push(reg('Registro, ITBI e diligências', [calc(function (r) { return R$(r.valores.itbiV); })],
       'Incide sobre o pagamento em dinheiro mais o valor presente da permuta.', true));
-    custo('(Critério 1) Custo de obra por m² de ALV', 'custos.obraM2', 'num', 'R$ por m² vendável para implantar a infraestrutura.', { un: 'R$' });
-    custo('(Critério 2) Custo de obra como % do VGV', 'custos.obraPctVGV', 'pct', 'Alternativa ao critério 1.');
+    custo('(Critério 1) Custo de obra por m² de ALV', 'custos.obraM2', 'num', 'Terraplenagem, drenagem, pavimentação, redes e paisagismo, por m² vendável. Usual entre R$ 200 e R$ 350 no loteamento aberto.', { un: 'R$' });
+    custo('(Critério 2) Custo de obra como % do VGV', 'custos.obraPctVGV', 'pct', 'Alternativa ao critério 1, para quando a referência de mercado vem do VGV. Usual entre 15% e 25%.');
     c.push(reg('Critério adotado', [inp('custos.criterio', 'sel', { opcoes: ['Critério 1', 'Critério 2'] })],
       'Escolhe qual dos dois critérios acima entra na conta; o outro fica só como referência.'));
     c.push(reg('Custo de obra adotado', [calc(function (r) { return R$(r.valores.obraTotal); })],
       'Resultado do critério escolhido, apurado sobre a ALV utilizada pelo programa.', true));
-    custo('Parcela pré-operacional', 'custos.pctPreOp', 'pct', 'Fatia do custo de implantação destinada a projetos, aprovações e licenciamento.');
+    custo('Parcela pré-operacional', 'custos.pctPreOp', 'pct', 'Fatia do custo de implantação destinada a projetos, aprovações e licenciamento. Usual entre 5% e 10%.');
     c.push(reg('Despesas pré-operacionais', [calc(function (r) { return R$(r.valores.preOpV); })],
       'A parcela acima aplicada ao custo de implantação: o que se gasta antes do lançamento.', true));
     c.push(reg('Despesas de obra', [calc(function (r) { return R$(r.valores.obraExec); })],
       'O que sobra do custo de implantação: a execução da infraestrutura.', true));
-    custo('CGA', 'custos.cga', 'pct', 'Rateio da estrutura da incorporadora, sobre o VGV bruto.');
-    custo('Gerenciamento da obra', 'custos.gerenciamento', 'pct', 'Sobre o custo de obra; segue o mesmo cronograma e o INCC.');
-    custo('Manutenção pós-obra', 'custos.manutencao', 'pct', 'Conservação das áreas comuns após a entrega de cada fase.');
-    custo('Despesas de marketing', 'custos.marketing', 'pct', 'Sobre o VGV. Dividido entre as fases ativas.');
-    custo('Stand de vendas', 'custos.stand', 'pct', 'Sobre o VGV. Concentra parte na pré-abertura da 1ª fase.');
-    custo('Taxa de gestão comercial', 'custos.gestaoComercial', 'pct', 'Sobre o VGV vendido.');
-    custo('Premiação s/ vendas', 'custos.premiacao', 'pct', 'Campanhas para imobiliárias e corretores, sobre o VGV vendido.');
-    custo('Despesas adm. de vendas', 'custos.admVendas', 'pct', 'Sobre o VGV, diluídas do lançamento ao último recebimento.');
-    custo('Despesas bancárias', 'custos.bancarias', 'pct', 'Tarifas, custódia e gestão da carteira de recebíveis.');
+    custo('CGA', 'custos.cga', 'pct', 'Rateio da estrutura da incorporadora, sobre o VGV bruto. Usual entre 3% e 5%.');
+    custo('Gerenciamento da obra', 'custos.gerenciamento', 'pct', 'Sobre o custo de obra; segue o mesmo cronograma e o INCC. Usual entre 4% e 8%.');
+    custo('Manutenção pós-obra', 'custos.manutencao', 'pct', 'Conservação das áreas comuns após a entrega, até a assunção pelo município ou pela associação. Usual de 1% do custo de obra.');
+    custo('Despesas de marketing', 'custos.marketing', 'pct', 'Mídia, lançamento e material de venda, sobre o VGV, dividido entre as fases ativas. Usual entre 2% e 4%.');
+    custo('Stand de vendas', 'custos.stand', 'pct', 'Construção, operação e desmobilização do plantão, sobre o VGV, concentrando parte na pré-abertura. Usual de 1%.');
+    custo('Taxa de gestão comercial', 'custos.gestaoComercial', 'pct', 'Remuneração da imobiliária pela gestão da equipe, além da corretagem, sobre o VGV vendido. Usual de 0,5%.');
+    custo('Premiação s/ vendas', 'custos.premiacao', 'pct', 'Campanhas e bônus para imobiliárias e corretores, sobre o VGV vendido. Usual de 0,5%.');
+    custo('Despesas adm. de vendas', 'custos.admVendas', 'pct', 'Contratos, cartório e cobrança, sobre o VGV, diluídas do lançamento ao último recebimento. Usual de 1,5%.');
+    custo('Despesas bancárias', 'custos.bancarias', 'pct', 'Tarifas, custódia e gestão da carteira de recebíveis, sobre o VGV. Usual de 0,2%.');
     f.appendChild(quadro('Custos e despesas', null, c));
 
     /* 9 — financiamento */

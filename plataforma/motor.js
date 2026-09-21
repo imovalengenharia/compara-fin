@@ -456,7 +456,34 @@
   }
 
   /* ------------------------------------------------------------ cálculo */
+  /* Premissas de custo não informadas valem o percentual usual de mercado.
+     Como nas destinações da gleba, a sugestão entra na conta de verdade —
+     o que o avaliador não informou o modelo assume, e a tela diz qual é. */
+  var USUAIS = {
+    'custos.impostos': 0.0673, 'custos.comissoes': 0.045, 'custos.contrapartidas': 0.025,
+    'custos.outrosTerreno': 0.02, 'custos.obraM2': 300, 'custos.obraPctVGV': 0.20,
+    'custos.pctPreOp': 0.08,
+    'custos.cga': 0.03, 'custos.gerenciamento': 0.06, 'custos.manutencao': 0.01,
+    'custos.marketing': 0.03, 'custos.stand': 0.01, 'custos.gestaoComercial': 0.005,
+    'custos.premiacao': 0.005, 'custos.admVendas': 0.015, 'custos.bancarias': 0.002
+  };
+  function comUsuais(P) {
+    var Q = null;
+    Object.keys(USUAIS).forEach(function (k) {
+      var i = k.indexOf('.'), g = k.slice(0, i), c = k.slice(i + 1);
+      var grupo = (Q || P)[g];
+      if (!grupo) return;
+      var v = grupo[c];
+      if (v !== null && v !== undefined && v !== '') return;
+      if (!Q) { Q = {}; for (var x in P) Q[x] = P[x]; }
+      if (Q[g] === P[g]) { var novo = {}; for (var y in P[g]) novo[y] = P[g][y]; Q[g] = novo; }
+      Q[g][c] = USUAIS[k];
+    });
+    return Q || P;
+  }
+
   function calcular(P) {
+    P = comUsuais(P);
     var areas = quadroAreas(P), prog = programa(P), cron = cronogramaEVendas(P, prog);
     var R = receitas(P, prog, cron);
     var idx = P.indices;
@@ -666,5 +693,5 @@
   }
 
   root.Motor = { calcular: calcular, HORIZONTE: HORIZONTE, COLUNAS: COLUNAS,
-                 MODALIDADES: MODALIDADES, destinos: destinos };
+                 MODALIDADES: MODALIDADES, destinos: destinos, USUAIS: USUAIS };
 })(typeof window !== 'undefined' ? window : globalThis);
