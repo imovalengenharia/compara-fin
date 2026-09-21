@@ -553,7 +553,7 @@
       { rot: 'Juros acima do IPCA (a.a.)', cels: idx.map(function (i) { return inp('planos.' + i + '.jurosReal', 'pct'); }) },
       { rot: 'Juros nominal equivalente', forte: true, cels: idx.map(function (i) {
           return calc(function (r) { return r.planosProduto[0][i].n > 1 ? pc(r.planosProduto[0][i].jurosNominal, 2) : '—'; }); }) }
-    ], 'O rateio das unidades distribui o programa entre os planos e só vale para os produtos marcados como "mix dos planos" no quadro seguinte — na prática, os residenciais. Um produto que aponte para um plano específico vende 100% das suas unidades naquele plano, e o rateio não o afeta. No plano à vista, uma parcela e 100% de entrada são definição, não escolha: por isso os dois campos vêm travados. A parcela é fixa em moeda nominal, calculada pela Price sobre o preço-base e corrigida pelo fator do mês da venda.')]));
+    ], 'A parcela é fixa em moeda nominal, calculada pela Price sobre o preço-base. Preço corrigido até a data da venda.')]));
 
     /* 4 — produtos: residenciais e comerciais no mesmo quadro */
     var colProd = [1, 2, 3, 4, 5].map(function (i) { return 'Produto ' + i; });
