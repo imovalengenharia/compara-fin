@@ -18,7 +18,7 @@
   --campo-bg:#1A2027; --campo-borda:#303945; --campo-foco:#C2A878;
   --pos:#6FB08C; --neg:#D98A63; --warn:#C2A878; --aviso-bg:#20191055;
   --sombra:0 1px 2px rgba(0,0,0,.35);
-  --rot:296px; --campo:132px; --comp:152px; --uni:32px; --gap:24px; --dentro:8px;
+  --rot:296px; --campo:132px; --uni:32px; --gap:24px; --dentro:8px;
   /* uma altura de linha e seis tamanhos de letra governam a plataforma
      inteira — só o fluxo de caixa, por ser denso, tem escala própria */
   --linha:34px; --alt:28px; --lh:1.45; --sufixo:21px; --prefixo:25px;
@@ -98,8 +98,8 @@ details.quadro[open]>summary .seta{transform:rotate(45deg)}
 details.quadro>summary:focus-visible{outline:2px solid var(--acento);outline-offset:-2px}
 .quadro .interior{padding:2px 14px 10px}
 
-/* ---------- registro: rótulo | campo | unidade | complemento | nota ---------- */
-.reg{display:grid;grid-template-columns:var(--rot) var(--campo) var(--uni) var(--comp) minmax(0,1fr);
+/* ---------- registro: rótulo | campo | unidade | nota ---------- */
+.reg{display:grid;grid-template-columns:var(--rot) var(--campo) var(--uni) minmax(0,1fr);
   gap:0 var(--gap);align-items:center;min-height:var(--linha);padding:3px 0;
   border-bottom:1px solid var(--rule-soft)}
 .reg:last-child{border-bottom:none}
@@ -107,18 +107,22 @@ details.quadro>summary:focus-visible{outline:2px solid var(--acento);outline-off
 .reg>.val{display:flex;justify-content:flex-end;align-items:center}
 .reg>.val>*{width:100%}
 .reg>.uni{font-size:var(--t-uni);color:var(--muted);white-space:nowrap}
-.reg>.comp{font-size:var(--t-val);color:var(--muted);font-family:var(--mono);text-align:left;
-  font-variant-numeric:tabular-nums;white-space:nowrap}
 .reg>.nota{font-size:var(--t-nota);color:var(--muted);line-height:var(--lh)}
-.reg>.livre{grid-column:2/5;display:flex;justify-content:flex-end;align-items:center;gap:7px}
+/* o complemento abre a nota: número em monoespaçada, explicação em seguida */
+.reg>.nota>.comp{padding:0;font-family:var(--mono);font-size:var(--t-nota);color:var(--ink2);
+  text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap}
+.reg>.nota>.comp+span:not(:empty)::before{content:' · '}
+/* complemento sem valor não abre a nota nem deixa o separador solto */
+.reg>.nota>.comp.nulo{display:none}
+.reg>.nota>.comp.nulo+span::before{content:none}
+.reg>.livre{grid-column:2/4;display:flex;justify-content:flex-end;align-items:center;gap:7px}
 .reg>.livre>*{width:auto}
 @media (max-width:1560px){
-  :root{--rot:264px;--comp:140px;--gap:18px}
+  :root{--rot:264px;--gap:18px}
 }
 @media (max-width:1100px){
-  :root{--rot:200px;--campo:118px;--comp:118px;--gap:12px}
+  :root{--rot:200px;--campo:118px;--gap:12px}
   .reg{grid-template-columns:minmax(0,1fr) var(--campo) 30px;gap:0 8px}
-  .reg>.comp{grid-column:2/4}
   .reg>.nota{grid-column:1/-1;padding-bottom:4px}
   .reg>.livre{grid-column:1/-1;justify-content:flex-start}
 }

@@ -407,6 +407,7 @@
       /* só o que é número guarda a folga do afixo à direita; texto usa a
          célula inteira, senão quebra linha à toa */
       el.classList.toggle('txt', !/^[-\dR—]/.test(String(t).trim()));
+      el.classList.toggle('nulo', String(t).trim() === VAZIO);
     });
     return el;
   }
@@ -429,17 +430,22 @@
     }
     var linha = e('div', { cls: 'reg' + (forte ? ' forte' : '') },
       [e('div', { cls: 'rot', txt: rot })]);
+    var comp = null;
     if (celulas.length > 3) {
       linha.appendChild(e('div', { cls: 'livre' }, celulas));
     } else {
       linha.appendChild(e('div', { cls: 'val' }, celulas[0] ? [celulas[0]] : []));
       linha.appendChild(e('div', { cls: 'uni' }, temUn ? [celulas[1]] : []));
-      var comp = temUn ? celulas[2] : celulas[1];
-      linha.appendChild(e('div', { cls: 'comp' }, comp ? [comp] : []));
+      comp = temUn ? celulas[2] : celulas[1];
     }
+    /* o complemento não tem coluna própria: abre a nota, como o número que
+       qualifica a explicação que vem logo depois */
     var nd = e('div', { cls: 'nota' });
-    if (typeof nota === 'function') atualizadores.push(function (r) { nd.textContent = nota(r); });
-    else nd.textContent = nota || '';
+    if (comp) { comp.classList.add('comp'); nd.appendChild(comp); }
+    var txt = e('span');
+    if (typeof nota === 'function') atualizadores.push(function (r) { txt.textContent = nota(r); });
+    else txt.textContent = nota || '';
+    nd.appendChild(txt);
     linha.appendChild(nd);
     return linha;
   }
