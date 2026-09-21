@@ -45,7 +45,7 @@
       janelas: { terrenoIni: 0, terrenoParc: 1, itbiIni: 1, itbiParc: 1, preOpIni: 1,
                  contrapAnteObra: -3, contrapDur: 6, manutT1: 24, manutP1: .7, manutT2: 12, manutP2: .3,
                  mktAntes: -6, mktPctAntes: .6, mktDepois: 36, standAntes: -3, standPctAntes: .3 },
-      terreno: { modo: 'resolver', forma: 'permuta', pctDinheiro: .4, valorDinheiro: 0, permutaPct: .42 }
+      terreno: { modo: 'resolver', forma: 'permuta', valorDinheiro: 0, sinal: 0, permutaPct: .42 }
     };
   }
 
@@ -106,10 +106,11 @@
     if (!agrupado && dec === null) return neg ? '-' : '';
     return (neg ? '-' : '') + (agrupado || '0') + (dec === null ? '' : ',' + dec);
   }
-  function porNum(v, inteiro, casas) {
+  function porNum(v, inteiro, casas, zero) {
     if (v === null || v === undefined || !isFinite(v)) return '';
     var minimo = casas === undefined ? 1e-9 : 0.5 / Math.pow(10, casas);
-    if (Math.abs(v) < minimo) return VAZIO;
+    /* em campo de mês o zero é a data-base, não ausência de valor */
+    if (!zero && Math.abs(v) < minimo) return VAZIO;
     var txt = casas === undefined ? String(Math.round(v * 1e6) / 1e6) : v.toFixed(casas);
     return fmtCampo(txt.replace('.', ','), inteiro, casas);
   }
@@ -132,7 +133,8 @@
     var sug = el.dataset.sugerido, g = pegar(caminho);
     var usa = sug !== undefined && semValor(g);
     var v = usa ? +sug : g;
-    el.value = porNum(tipo === 'pct' ? (v || 0) * 100 : v, inteiro, casasDe(tipo));
+    el.value = porNum(tipo === 'pct' ? (v || 0) * 100 : v, inteiro, casasDe(tipo),
+      el.dataset.zero === '1');
     el.classList.toggle('sugerido', usa);
   }
 
@@ -322,7 +324,8 @@
         var lim = null;
         if (el.dataset.max !== undefined && v > +el.dataset.max) lim = +el.dataset.max;
         if (ev.type === 'change' && el.dataset.min !== undefined && v < +el.dataset.min) lim = +el.dataset.min;
-        if (lim !== null) { v = lim; el.value = porNum(t === 'pct' ? v * 100 : v, el.dataset.inteiro === '1', casasDe(t)); }
+        if (lim !== null) { v = lim; el.value = porNum(t === 'pct' ? v * 100 : v,
+          el.dataset.inteiro === '1', casasDe(t), el.dataset.zero === '1'); }
         el.classList.remove('sugerido');
       }
     }
@@ -362,6 +365,7 @@
                         inputmode: inteiro ? 'numeric' : 'decimal',
                         autocomplete: 'off', spellcheck: 'false' });
       if (inteiro) el.dataset.inteiro = '1';
+      if (opts.zero) el.dataset.zero = '1';
       if (opts.sugerido !== undefined && opts.sugerido !== null) el.dataset.sugerido = opts.sugerido;
       mostrarSugerido(el, caminho, tipo, inteiro);
       if (opts.min !== undefined) el.dataset.min = opts.min;
@@ -543,7 +547,7 @@
 
     /* 2 — eventos e faseamento */
     f.appendChild(quadro('Eventos e faseamento', 'o mês 0 é a data-base do estudo', [
-      reg('Pré-operacionais', [inp('prazos.preOp', 'num', { step: 1, min: 0, max: 120 }), un('meses')],
+      reg('Pré-operacionais', [inp('prazos.preOp', 'num', { step: 1, min: 0, max: 120, zero: true }), un('meses')],
         function (r) {
           return 'Aprovações, registro, projetos e licenciamento. Terminam no mês ' +
             n(Math.round(+P.prazos.preOp || 0), 0) + ', quando a 1ª fase é lançada.';
@@ -652,7 +656,7 @@
       if (Motor.USUAIS[caminho] !== undefined) opts.sugerido = Motor.USUAIS[caminho];
       c.push(reg(rot, [inp(caminho, tipo, opts), un(tipo === 'pct' ? '%' : opts.un || '')], nota));
     }
-    custo('Impostos s/ vendas', 'custos.impostos', 'pct', 'Lucro presumido no regime de caixa — PIS, COFINS, IRPJ e CSLL sobre a receita recebida. A conta fechada dá 6,73%; com patrimônio de afetação no RET, 4%.');
+    custo('Impostos s/ vendas', 'custos.impostos', 'pct', 'PIS, COFINS, IRPJ e CSLL sobre a receita recebida, no lucro presumido. A conta fechada dá 6,73%; no RET com afetação, 4%.');
     custo('Comissões s/ vendas', 'custos.comissoes', 'pct', 'Corretagem sobre o VGV vendido, reconhecida no mês da venda. Usual entre 4% e 6% no loteamento.');
     custo('Contrapartidas', 'custos.contrapartidas', 'pct', 'Obras de interesse público exigidas na aprovação, sobre o VGV. Varia com o município; usual até 3%.');
     custo('Outros custos com terreno', 'custos.outrosTerreno', 'pct', 'ITBI, registro e diligências sobre o equivalente à vista da aquisição. Só o ITBI já costuma ser 2%; some o registro.');
@@ -712,32 +716,34 @@
           : 'Informado: você trava o que está sendo pago pela terra e o modelo devolve a TIR que sobra.'),
       reg('Forma de pagamento', [inp('terreno.forma', 'sel',
         { opcoes: ['permuta', 'avista', 'misto'], remonta: true })],
-        'Permuta: percentual da receita líquida. À vista: dinheiro no cronograma abaixo. Misto: parte em cada um.')
+        'Permuta: percentual da receita líquida. À vista: só dinheiro, e o modelo devolve quanto cabe. Misto: você define o dinheiro e a permuta absorve o resto.')
     ];
-    if (forma === 'misto') linhasTerreno.push(reg('Parcela paga em dinheiro',
-      [inp('terreno.pctDinheiro', 'pct'), un('%')],
-      'Quanto do valor da gleba sai em dinheiro. O restante vira permuta financeira.'));
+    /* No misto o dinheiro é dado e a permuta absorve o resto; na aquisição à
+       vista o dinheiro é a própria incógnita e o modelo o devolve. */
+    if (forma === 'misto' || (!modoResolver && forma !== 'permuta')) {
+      linhasTerreno.push(reg('Pagamento em dinheiro — total',
+        [inp('terreno.valorDinheiro', 'num', { un: 'R$' })],
+        modoResolver && forma === 'misto'
+          ? 'Quanto da gleba é pago em moeda. O que a TMA ainda permitir vira permuta financeira.'
+          : 'Valor nominal acordado em moeda, distribuído no cronograma abaixo.'));
+    }
     if (forma !== 'permuta') {
-      linhasTerreno.push(reg('Pagamento em dinheiro — mês inicial',
-        [inp('janelas.terrenoIni', 'num', { step: 1 }), un('mês')]));
+      linhasTerreno.push(reg('Pagamento em dinheiro — sinal',
+        [inp('terreno.sinal', 'num', { un: 'R$' })],
+        'Parte paga na assinatura, no mês 0. O saldo vai para as parcelas abaixo.'));
+      linhasTerreno.push(reg('Pagamento em dinheiro — início das parcelas',
+        [inp('janelas.terrenoIni', 'num', { step: 1, zero: true }), un('mês')],
+        'Mês em que começa o pagamento do saldo, depois do sinal.'));
       linhasTerreno.push(reg('Pagamento em dinheiro — nº de parcelas',
         [inp('janelas.terrenoParc', 'num', { step: 1 }), un('parc.')],
         'Parcelas iguais e sem reajuste contratual — o custo real cai com o tempo.'));
     }
-    if (!modoResolver) {
-      if (forma !== 'permuta') linhasTerreno.push(reg('Valor pago em dinheiro',
-        [inp('terreno.valorDinheiro', 'num'), un('R$')]));
-      if (forma !== 'avista') linhasTerreno.push(reg('Permuta financeira',
-        [inp('terreno.permutaPct', 'pct'), un('%')], 'Percentual da receita líquida mensal.'));
-    }
+    if (!modoResolver && forma !== 'avista') linhasTerreno.push(reg('Permuta financeira',
+      [inp('terreno.permutaPct', 'pct'), un('%')], 'Percentual da receita líquida mensal.'));
     linhasTerreno.push(reg('Valor da gleba — equivalente à vista',
       [calc(function (r) { return R$(r.ind.valorTerreno); })],
       modoResolver ? 'É o teto: acima disso o empreendimento deixa de remunerar a TMA.'
                    : 'Soma do dinheiro e do valor presente da permuta.', true));
-    linhasTerreno.push(reg('   parte em dinheiro',
-      [calc(function (r) { return R$(r.ind.caixaTerreno); }),
-       calc(function (r) { return pc(r.ind.pctDinheiroEfetivo) + ' do valor'; }, 'fraco')],
-      'Valor nominal, distribuído no cronograma acima.'));
     linhasTerreno.push(reg('   parte em permuta',
       [calc(function (r) { return R$(r.ind.vpPermuta); }),
        calc(function (r) { return pc(r.ind.permutaPct) + ' da receita'; }, 'fraco')],
@@ -752,12 +758,21 @@
     btnEscala.addEventListener('click', function () {
       btnEscala.disabled = true; btnEscala.textContent = 'calculando…';
       setTimeout(function () {
+        /* o teto à vista é o maior dinheiro que o estudo suporta: a escala
+           varre desse limite até a permuta pura */
+        var soPerm = JSON.parse(JSON.stringify(P));
+        soPerm.terreno = { modo: 'resolver', forma: 'avista', valorDinheiro: 0,
+                           sinal: P.terreno.sinal, permutaPct: 0 };
+        var teto = Motor.calcular(soPerm).ind.caixaTerreno;
         var pontos = [0, 0.25, 0.5, 0.75, 1].map(function (a) {
           var copia = JSON.parse(JSON.stringify(P));
-          copia.terreno = { modo: 'resolver', pctDinheiro: a, valorDinheiro: 0, permutaPct: 0,
-            forma: a === 0 ? 'permuta' : a === 1 ? 'avista' : 'misto' };
+          copia.terreno = { modo: 'resolver', valorDinheiro: a * teto, sinal: P.terreno.sinal,
+            permutaPct: 0, forma: a === 0 ? 'permuta' : a === 1 ? 'avista' : 'misto' };
           var x = Motor.calcular(copia).ind;
-          return { a: a, valor: x.valorTerreno, caixa: x.caixaTerreno, perm: x.permutaPct,
+          /* a fração se mede em valor presente: o dinheiro parcelado vale
+             menos que o seu nominal */
+          return { a: x.pctDinheiroEfetivo,
+                   valor: x.valorTerreno, caixa: x.caixaTerreno, perm: x.permutaPct,
                    inv: x.investimento, pb: x.payback };
         });
         var th = e('tr', {}, ['Pago em dinheiro', 'Valor da gleba', 'Em dinheiro (R$)',
@@ -779,12 +794,14 @@
     f.appendChild(quadro('Terreno — quanto a gleba pode custar',
       modoResolver ? 'TIR travada na TMA' : 'valor informado', linhasTerreno,
       modoResolver
-        ? 'O solver busca o valor que zera o VPL na TMA e o reparte entre dinheiro e permuta na proporção escolhida. Antecipar o desembolso reduz o teto: pagar tudo à vista vale menos para o empreendedor do que a mesma quantia diluída em permuta.'
+        ? 'O solver busca o que zera o VPL na TMA: com o dinheiro definido, resolve a permuta; na aquisição à vista, resolve o próprio dinheiro. Antecipar o desembolso reduz o teto — pagar tudo à vista vale menos para o empreendedor do que a mesma quantia diluída em permuta.'
         : null));
 
     /* 12 — janelas */
     var j = [];
-    function jan(rot, caminho, tipo, nota) { j.push(reg(rot, [inp(caminho, tipo, { step: 1 }), un(tipo === 'pct' ? '%' : 'mês')], nota)); }
+    function jan(rot, caminho, tipo, nota) {
+      j.push(reg(rot, [inp(caminho, tipo, { step: 1, zero: true }), un(tipo === 'pct' ? '%' : 'mês')], nota));
+    }
     jan('Registro e ITBI — mês inicial', 'janelas.itbiIni', 'num', 'Mês em que começa o desembolso da aquisição.');
     jan('Registro e ITBI — nº de parcelas', 'janelas.itbiParc', 'num', 'Em quantas parcelas iguais ele é dividido.');
     jan('Contrapartidas — meses antes da obra', 'janelas.contrapAnteObra', 'num', 'Negativo: antecede o início da obra da fase.');
@@ -930,7 +947,7 @@
       });
       tb.appendChild(tot);
       r.meses.forEach(function (m) {
-        var tr = e('tr', {}, [e('td', { txt: n(m.mes, 0) })]);
+        var tr = e('tr', {}, [e('td', { txt: nz(m.mes, 0) })]);   /* o mês 0 é a data-base */
         cols.forEach(function (c) {
           var v = m[c[0]];
           tr.appendChild(e('td', { cls: v < 0 ? 'neg' : '', txt: Math.abs(v) < 0.5 ? '·' : n(v, 0) }));
@@ -1340,8 +1357,11 @@
           if (!p.areas.aberto) p.areas.aberto = { circulacao: .20, verdeLazer: .10, institucional: .05 };
           if (!p.areas.condominio) p.areas.condominio = { circulacao: .15, verdeLazer: .10, institucional: .05 };
           if (!p.terreno) p.terreno = { modo: (p.permuta && p.permuta.modo === 'fixo') ? 'informado' : 'resolver',
-            forma: 'permuta', pctDinheiro: .4, valorDinheiro: p.custos ? (p.custos.aquisicao || 0) : 0,
-            permutaPct: p.permuta ? p.permuta.valor : .42 };
+            forma: 'permuta', valorDinheiro: p.custos ? (p.custos.aquisicao || 0) : 0,
+            sinal: 0, permutaPct: p.permuta ? p.permuta.valor : .42 };
+          /* o dinheiro deixou de ser percentual do valor resolvido */
+          if (p.terreno.pctDinheiro !== undefined) delete p.terreno.pctDinheiro;
+          if (p.terreno.sinal === undefined) p.terreno.sinal = 0;
           if (!p.produtos && p.residenciais) {          /* formato anterior: dois quadros separados */
             p.produtos = p.residenciais.map(function (x) {
               return { tipo: 'residencial', area: x.area, precoM2: x.precoM2,

@@ -62,7 +62,7 @@ function ITU(over) {
     janelas: { terrenoIni: 0, terrenoParc: 1, itbiIni: 1, itbiParc: 1, preOpIni: 1,
                contrapAnteObra: -3, contrapDur: 6, manutT1: 24, manutP1: .7, manutT2: 12, manutP2: .3,
                mktAntes: -6, mktPctAntes: .6, mktDepois: 36, standAntes: -3, standPctAntes: .3 },
-    terreno: { modo: 'resolver', forma: 'permuta', pctDinheiro: 0, valorDinheiro: 0, permutaPct: 0.42 }
+    terreno: { modo: 'resolver', forma: 'permuta', valorDinheiro: 0, sinal: 0, permutaPct: 0.42 }
   };
   if (over) over(P);
   return P;
@@ -72,7 +72,7 @@ var soma = function (a) { return a.reduce(function (x, y) { return x + y; }, 0);
 /* ============================ 1 · ADERÊNCIA À PLANILHA DE ORIGEM ========= */
 B('1 · ADERÊNCIA À PLANILHA — referencial Itu, permuta travada em 41,9715%');
 var fixo = Motor.calcular(ITU(function (P) {
-  P.terreno = { modo: 'informado', forma: 'permuta', pctDinheiro: 0, valorDinheiro: 0,
+  P.terreno = { modo: 'informado', forma: 'permuta', valorDinheiro: 0, sinal: 0,
                 permutaPct: 0.41971472001994564 };
 }));
 var T = fixo.totais, rel = { rel: 0.0005 };
@@ -146,17 +146,18 @@ function coerencia(r, etiqueta) {
 coerencia(fixo, 'permuta fixa');
 
 B('2b · TRAVA DA TIR NA TMA — as três formas de pagamento');
-var formas = [['permuta', 0], ['avista', 1], ['misto 40% em dinheiro', 0.4]];
+var formas = [['permuta', 'permuta', 0], ['avista', 'avista', 0],
+              ['misto com R$ 8 M em dinheiro', 'misto', 8e6]];
 var resolvidos = {};
 formas.forEach(function (f) {
   var r = Motor.calcular(ITU(function (P) {
-    P.terreno = { modo: 'resolver', forma: f[1] === 0 ? 'permuta' : f[1] === 1 ? 'avista' : 'misto',
-                  pctDinheiro: f[1], valorDinheiro: 0, permutaPct: 0 };
+    P.terreno = { modo: 'resolver', forma: f[1], valorDinheiro: f[2], sinal: 0, permutaPct: 0 };
   }));
   resolvidos[f[0]] = r;
   conferir(f[0] + ' · VPL zerado', r.ind.vpl, 0, { abs: 500 });
   conferir(f[0] + ' · TIR = TMA', (r.ind.tir - r.ind.tma) * 100, 0, { abs: 0.01 });
-  conferir(f[0] + ' · parcela em dinheiro conforme escolhido', r.ind.pctDinheiroEfetivo, f[1], { abs: 0.005 });
+  conferir(f[0] + ' · dinheiro conforme informado', r.ind.caixaTerreno,
+           f[1] === 'avista' ? r.ind.caixaTerreno : f[2], { abs: 1 });
   coerencia(r, f[0]);
 });
 
@@ -164,8 +165,8 @@ formas.forEach(function (f) {
 B('3 · COMPORTAMENTO ECONÔMICO — o modelo responde na direção certa');
 var vP = resolvidos['permuta'].ind.valorTerreno;
 var vV = resolvidos['avista'].ind.valorTerreno;
-var vM = resolvidos['misto 40% em dinheiro'].ind.valorTerreno;
-console.log('  permuta pura R$ ' + fmt(vP) + '  ·  misto 40% R$ ' + fmt(vM) + '  ·  à vista R$ ' + fmt(vV));
+var vM = resolvidos['misto com R$ 8 M em dinheiro'].ind.valorTerreno;
+console.log('  permuta pura R$ ' + fmt(vP) + '  ·  misto R$ ' + fmt(vM) + '  ·  à vista R$ ' + fmt(vV));
 conferir('pagar à vista reduz o teto (antecipa o desembolso)', vV < vP, true);
 conferir('o misto fica entre os dois extremos', vM < vP && vM > vV, true);
 function teto(over) { return Motor.calcular(ITU(over)).ind.valorTerreno; }
@@ -177,19 +178,20 @@ conferir('TMA maior reduz o teto', teto(function (P) { P.indices.multiplo = 2.4;
 conferir('venda mais rápida aumenta o teto', teto(function (P) {
   P.fases[0].velLanc = 0.35; P.fases[0].velPos = 0.1; }) > base, true);
 conferir('prazo de obra maior reduz o teto', teto(function (P) { P.fases[0].prazoObra = 30; }) < base, true);
-var escala = [0, 0.25, 0.5, 0.75, 1].map(function (a) {
+var escala = [0, 4e6, 8e6, 12e6].map(function (d) {
   return Motor.calcular(ITU(function (P) {
-    P.terreno = { modo: 'resolver', forma: 'misto', pctDinheiro: a, valorDinheiro: 0, permutaPct: 0 };
+    P.terreno = { modo: 'resolver', forma: d === 0 ? 'permuta' : 'misto',
+                  valorDinheiro: d, sinal: 0, permutaPct: 0 };
   })).ind.valorTerreno;
 });
 var monotona = escala.every(function (v, i) { return i === 0 || v <= escala[i - 1] + 1; });
-conferir('teto cai monotonicamente conforme sobe a parcela à vista', monotona, true);
-console.log('  escala 0% → 100% em dinheiro: ' + escala.map(function (v) { return fmt(v); }).join('  ·  '));
+conferir('teto cai monotonicamente conforme sobe o dinheiro', monotona, true);
+console.log('  escala R$ 0 → 12 M em dinheiro: ' + escala.map(function (v) { return fmt(v); }).join('  ·  '));
 
 B('3b · IDA E VOLTA — informar o valor resolvido devolve a mesma TIR');
-var res = resolvidos['misto 40% em dinheiro'];
+var res = resolvidos['misto com R$ 8 M em dinheiro'];
 var volta = Motor.calcular(ITU(function (P) {
-  P.terreno = { modo: 'informado', forma: 'misto', pctDinheiro: 0.4,
+  P.terreno = { modo: 'informado', forma: 'misto', sinal: 0,
                 valorDinheiro: res.ind.caixaTerreno, permutaPct: res.ind.permutaPct };
 }));
 conferir('mesmo valor de terreno', volta.ind.valorTerreno, res.ind.valorTerreno, { rel: 0.001 });

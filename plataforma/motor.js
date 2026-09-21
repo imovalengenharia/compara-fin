@@ -325,7 +325,12 @@
         if (m >= 0 && m < N) alvo[m] += (valor / dur) * inflator(m);
       }
     }
-    espalhar(col.terreno, aquisicao, num(J.terrenoIni), Math.max(1, num(J.terrenoParc, 1)), fSEM);
+    /* O pagamento em dinheiro sai em duas peças: o sinal na assinatura, no
+       mês 0, e o saldo em parcelas iguais a partir do mês informado. */
+    var Tp = P.terreno || {};
+    var sinal = Math.max(0, Math.min(aquisicao, num(Tp.sinal)));
+    if (sinal > 0) col.terreno[0] += sinal;
+    espalhar(col.terreno, aquisicao - sinal, num(J.terrenoIni), Math.max(1, num(J.terrenoParc, 1)), fSEM);
     espalhar(col.itbi, itbiV, num(J.itbiIni, 1), Math.max(1, num(J.itbiParc, 1)), fSEM);
     espalhar(col.preop, preOpV, num(J.preOpIni, 1), Math.max(1, Math.round(num(P.prazos.preOp))), fIPCA);
 
@@ -499,25 +504,8 @@
        O ITBI incide sobre o equivalente à vista, e ele próprio depende do
        valor — por isso cada avaliação itera até fechar.
        ------------------------------------------------------------------- */
-    var T = P.terreno || { modo: 'resolver', forma: 'permuta', pctDinheiro: 0,
-                           valorDinheiro: 0, permutaPct: 0.42 };
-    var alfa = T.forma === 'avista' ? 1 : T.forma === 'permuta' ? 0
-             : Math.max(0, Math.min(1, num(T.pctDinheiro)));
-
-    /* Fatores lineares: a permuta é proporcional a p e o caixa é proporcional ao
-       valor nominal, então basta medir uma unidade de cada. */
-    var base = montar(P, prog, cron, R, 0, 0, 0);
-    var unitPerm = z();
-    for (var u = 0; u < HORIZONTE; u++) unitPerm[u] = Math.max(0, base.liquida[u]);
-    var vpUnitPerm = vpl(unitPerm, taxaTerrenista);
-    var kParc = Math.max(1, Math.round(num(P.janelas.terrenoParc, 1)));
-    var mIni = num(P.janelas.terrenoIni, 0);
-    var unitCaixa = z();
-    for (var q2 = 0; q2 < kParc; q2++) {
-      var mm = Math.round(mIni + q2);
-      if (mm >= 0 && mm < HORIZONTE) unitCaixa[mm] += (1 / kParc) * Math.pow(1 + num(idx.ipca), -mm / 12);
-    }
-    var vpUnitCaixa = vpl(unitCaixa, taxaTerrenista) || 1;
+    var T = P.terreno || { modo: 'resolver', forma: 'permuta', valorDinheiro: 0,
+                           sinal: 0, permutaPct: 0.42 };
 
     function rodar(caixa, permPct) {
       var vp = 0, M = null;
@@ -526,34 +514,42 @@
         vp = Math.abs(vpl(M.col.permuta, taxaTerrenista));
       }
       M.vpPermuta = vp; M.caixaTerreno = caixa; M.permPct = permPct;
-      M.vpCaixa = caixa * vpUnitCaixa;
+      /* o valor presente do dinheiro sai do próprio fluxo, que já está em
+         moeda da base — não depende de o desembolso ser linear no valor */
+      M.vpCaixa = Math.abs(vpl(M.col.terreno, taxaTerrenista));
       M.valorTerreno = M.vpCaixa + vp;
       return M;
     }
-    /* Reparte um valor de gleba V entre caixa e permuta, conforme a forma escolhida */
-    function repartir(V) {
-      var caixa = vpUnitCaixa > 0 ? (alfa * V) / vpUnitCaixa : 0;
-      var p = vpUnitPerm > 0 ? ((1 - alfa) * V) / vpUnitPerm : 0;
-      return { caixa: caixa, p: p };
+    function vplDo(M) {
+      return vplInvestidor(fluxoInvestidor(M.fluxo, R.ultimoRecebimento).AW, tma);
+    }
+    /* Bisseção na única incógnita da forma escolhida: o dinheiro, quando a
+       aquisição é à vista, ou a permuta, quando há dinheiro definido. */
+    function resolver(min, max, avaliar) {
+      var lo = min, hi = max;
+      for (var k3 = 0; k3 < 60; k3++) {
+        var mid = (lo + hi) / 2;
+        if (vplDo(avaliar(mid)) > 0) lo = mid; else hi = mid;
+      }
+      return (lo + hi) / 2;
     }
 
     var permPct, caixaTerreno, M, excedePermuta = false;
+    var dinheiro = T.forma === 'permuta' ? 0 : num(T.valorDinheiro);
     if (T.modo === 'informado') {
-      caixaTerreno = num(T.valorDinheiro);
-      permPct = num(T.permutaPct);
+      caixaTerreno = dinheiro;
+      permPct = T.forma === 'avista' ? 0 : num(T.permutaPct);
       M = rodar(caixaTerreno, permPct);
+    } else if (T.forma === 'avista') {
+      caixaTerreno = resolver(0, Math.max(1e6, prog.vgv * 2), function (v) { return rodar(v, 0); });
+      permPct = 0;
+      M = rodar(caixaTerreno, 0);
     } else {
-      var lo = 0, hi = Math.max(1e6, prog.vgv * 2);
-      for (var k3 = 0; k3 < 60; k3++) {
-        var mid = (lo + hi) / 2, d = repartir(mid);
-        var ensaio = rodar(d.caixa, Math.min(1, d.p));
-        var vplEnsaio = vplInvestidor(fluxoInvestidor(ensaio.fluxo, R.ultimoRecebimento).AW, tma);
-        if (vplEnsaio > 0) lo = mid; else hi = mid;
-      }
-      var fim = repartir((lo + hi) / 2);
-      excedePermuta = fim.p > 1;
-      permPct = Math.min(1, fim.p);
-      caixaTerreno = fim.caixa;
+      /* o dinheiro está definido; a permuta absorve o que a TMA ainda permite */
+      caixaTerreno = dinheiro;
+      excedePermuta = vplDo(rodar(caixaTerreno, 1)) > 0;
+      permPct = excedePermuta ? 1
+              : resolver(0, 1, function (p) { return rodar(caixaTerreno, p); });
       M = rodar(caixaTerreno, permPct);
     }
 
@@ -675,7 +671,9 @@
         permutaPct: permPct, vpPermuta: M.vpPermuta, taxaTerrenista: taxaTerrenista,
         valorTerreno: M.valorTerreno, caixaTerreno: M.caixaTerreno, vpCaixa: M.vpCaixa,
         formaTerreno: T.forma, modoTerreno: T.modo, pctDinheiroEfetivo: M.valorTerreno > 0 ? M.vpCaixa / M.valorTerreno : 0,
-        excedePermuta: excedePermuta, parcelasTerreno: kParc, mesTerreno: mIni,
+        excedePermuta: excedePermuta,
+        parcelasTerreno: Math.max(1, Math.round(num(P.janelas.terrenoParc, 1))),
+        mesTerreno: num(P.janelas.terrenoIni, 0), sinalTerreno: Math.max(0, num(T.sinal)),
         valorM2Gleba: areas.gleba > 0 ? M.valorTerreno / areas.gleba : 0,
         valorM2ALV: prog.alv > 0 ? M.valorTerreno / prog.alv : 0,
         itbi: M.valores.itbiV,
