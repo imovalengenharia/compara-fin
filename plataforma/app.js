@@ -49,15 +49,23 @@
   }
 
   /* ------------------------------------------------------------- formatos */
-  function n(v, d) {
-    if (v === null || v === undefined || !isFinite(v)) return '—';
-    if (Math.abs(v) < 0.5 / Math.pow(10, d || 0)) v = 0;
+  var VAZIO = '—';
+  function vazio(v, d) {
+    return v === null || v === undefined || !isFinite(v) || Math.abs(v) < 0.5 / Math.pow(10, d || 0);
+  }
+  /* nz escreve o número como ele é; n troca o zero por travessão, porque uma
+     coluna cheia de zeros cansa a leitura e esconde o que de fato existe */
+  function nz(v, d) {
+    if (v === null || v === undefined || !isFinite(v)) return VAZIO;
     return v.toLocaleString('pt-BR', { minimumFractionDigits: d, maximumFractionDigits: d });
   }
-  var R$ = function (v, d) { return 'R$ ' + n(v, d === undefined ? 0 : d); };
-  var mi = function (v) { return 'R$ ' + n(v / 1e6, 1) + ' M'; };
-  var pc = function (v, d) { return n(v * 100, d === undefined ? 1 : d) + '\u00A0%'; };
-  var mes = function (v) { return v === null || v === undefined ? '—' : 'mês ' + n(v, 0); };
+  function n(v, d) { return vazio(v, d) ? VAZIO : nz(v, d); }
+  var R$ = function (v, d) { d = d === undefined ? 0 : d;
+    return vazio(v, d) ? VAZIO : 'R$ ' + nz(v, d); };
+  var mi = function (v) { return vazio(v / 1e6, 1) ? VAZIO : 'R$ ' + nz(v / 1e6, 1) + ' M'; };
+  var pc = function (v, d) { d = d === undefined ? 1 : d;
+    return vazio(v * 100, d) ? VAZIO : nz(v * 100, d) + '\u00A0%'; };
+  var mes = function (v) { return v === null || v === undefined ? VAZIO : 'mês ' + nz(v, 0); };
 
   /* Campos numéricos seguem o padrão brasileiro: ponto separa o milhar,
      vírgula separa o decimal — igual aos valores calculados ao lado. A tecla
@@ -96,11 +104,20 @@
   }
   function porNum(v, inteiro) {
     if (v === null || v === undefined || !isFinite(v)) return '';
+    if (Math.abs(v) < 1e-9) return VAZIO;
     return fmtCampo(String(Math.round(v * 1e6) / 1e6).replace('.', ','), inteiro);
   }
   /* Um campo que ainda mostra o número sugerido pela plataforma é escrito em
      letra mais clara. Assim que o avaliador digita um valor diferente, ele
      passa a ser dado dele e ganha a cor cheia. */
+  /* campo sem valor não exibe unidade: "—" já diz tudo */
+  function marcarVazio(el) {
+    var caixa = el.parentElement;
+    if (caixa && caixa.classList.contains('campo')) {
+      caixa.classList.toggle('sem-afixo', el.value === VAZIO || el.value === '');
+    }
+  }
+
   function marcarSugerido(el, valor) {
     if (el.dataset.sugerido === undefined) return;
     var igual = Math.abs((+valor || 0) - (+el.dataset.sugerido || 0)) < 1e-9;
@@ -187,6 +204,7 @@
   function aplicarLimite(el, caminho, valor, msg) {
     guardar(caminho, valor);
     el.value = porNum(valor, el.dataset.inteiro === '1');
+    marcarVazio(el);
     el.classList.add('limitado');
     setTimeout(function () { el.classList.remove('limitado'); }, 2200);
     avisar('Limitado pela ALV disponível', msg);
@@ -291,6 +309,7 @@
     var excessoAntes = excessoALV();
     guardar(c, v);
     marcarSugerido(el, v);
+    marcarVazio(el);
     travarALV(el, c);
     /* a gleba mudou e o programa não cabe mais: a edição vale, o aviso explica */
     if (excessoALV() > excessoAntes + 0.5) {
@@ -300,7 +319,10 @@
     }
     var remonta = el.dataset.remonta === '1';
     clearTimeout(timer);
-    timer = setTimeout(function () { recalcular(); if (remonta) montarFolha(true); }, 80);
+    timer = setTimeout(function () {
+      recalcular();
+      if (remonta) { montarAbas(); montarFolha(true); }
+    }, 80);
   }
 
   function inp(caminho, tipo, opts) {
@@ -328,6 +350,7 @@
         el.dataset.sugerido = opts.sugerido;
         marcarSugerido(el, pegar(caminho));
       }
+      setTimeout(function () { marcarVazio(el); }, 0);
       if (opts.min !== undefined) el.dataset.min = opts.min;
       if (opts.max !== undefined) el.dataset.max = opts.max;
       /* a tecla "." vira vírgula: dentro do campo o ponto é sempre milhar */
@@ -341,10 +364,16 @@
         try { el.setSelectionRange(a + 1, a + 1); } catch (err) {}
         el.dispatchEvent(new Event('input', { bubbles: true }));
       });
+      /* ao entrar, o travessão sai da frente para não atrapalhar a digitação */
+      el.addEventListener('focus', function () {
+        if (el.value === VAZIO) el.value = '';
+        marcarVazio(el);
+      });
       /* ao sair, mostra o valor que ficou guardado, já normalizado */
       el.addEventListener('blur', function () {
         var g = pegar(caminho);
         el.value = porNum(tipo === 'pct' ? (g || 0) * 100 : g, inteiro);
+        marcarVazio(el);
       });
     }
     el.dataset.caminho = caminho; el.dataset.tipo = tipo;
@@ -494,8 +523,9 @@
           return 'Aprovações, registro, projetos e licenciamento. Terminam no mês ' +
             n(Math.round(+P.prazos.preOp || 0), 0) + ', quando a 1ª fase é lançada.';
         }),
-      reg('Nº de fases do projeto', [inp('prazos.nFases', 'num', { step: 1, min: 1, max: 4 }), un('fases')],
-        'Cada fase tem obra, lançamento e curva de vendas próprios. As fases inativas não entram em nada.')
+      reg('Nº de fases do projeto',
+        [inp('prazos.nFases', 'num', { step: 1, min: 1, max: 4, remonta: true }), un('fases')],
+        'Cada fase tem obra, lançamento e curva de vendas próprios. Só as fases habilitadas aparecem.')
     ]));
 
     function opcoesPagamento() {
@@ -558,25 +588,25 @@
     ], 'Residencial vende ao longo das três janelas da fase; comercial é negociado em um único mês — Início é o lançamento da fase, Intermediário a entrega da obra e Fim o último mês de vendas. A forma de pagamento é livre para os dois: "mix dos planos" distribui as unidades conforme o quadro acima; "à vista, sem desconto" recebe tudo no ato pelo preço de tabela — é o usual do lote comercial; ou aponte um plano específico, e todas as unidades do produto vendem naquele plano.')]));
 
     /* 4 — quadro de fases */
-    var colFases = ['Fase 1', 'Fase 2', 'Fase 3', 'Fase 4'];
+    var fasesAtivas = [];
+    for (var fv = 0; fv < nFasesP(); fv++) fasesAtivas.push(fv);
+    var colFases = fasesAtivas.map(function (fa) { return 'Fase ' + (fa + 1); });
     var linhasFase = idxP.map(function (p) {
       return { rot: 'Lotes do Produto ' + (p + 1) + ' · ' + (P.produtos[p].tipo === 'comercial' ? 'com.' : 'resid.'),
-               cels: [0, 1, 2, 3].map(function (fa) { return inp('quadro.' + p + '.' + fa, 'num', { step: 1 }); }) };
+               cels: fasesAtivas.map(function (fa) { return inp('quadro.' + p + '.' + fa, 'num', { step: 1 }); }) };
     });
-    linhasFase.push({ rot: 'Fase ativa?', cels: [0, 1, 2, 3].map(function (fa) {
-      return calc(function (r) { return fa < r.prog.nFases ? 'Sim' : 'Não'; }, 'fraco'); }) });
-    linhasFase.push({ rot: 'Lotes totais da fase', forte: true, cels: [0, 1, 2, 3].map(function (fa) {
+    linhasFase.push({ rot: 'Lotes totais da fase', forte: true, cels: fasesAtivas.map(function (fa) {
       return calc(function (r) { return n(r.prog.fases[fa].totalLotes, 0); }); }) });
-    linhasFase.push({ rot: 'VGV da fase (R$)', forte: true, cels: [0, 1, 2, 3].map(function (fa) {
+    linhasFase.push({ rot: 'VGV da fase', forte: true, cels: fasesAtivas.map(function (fa) {
       return calc(function (r) { return n(r.prog.fases[fa].vgv, 0); }); }) });
-    linhasFase.push({ rot: 'ALV da fase (m²)', cels: [0, 1, 2, 3].map(function (fa) {
-      return calc(function (r) { return n(r.prog.fases[fa].alv, 0); }); }) });
+    linhasFase.push({ rot: 'ALV da fase', cels: fasesAtivas.map(function (fa) {
+      return calc(function (r) { return n(r.prog.fases[fa].alv, 0) + ' m²'; }); }) });
     f.appendChild(quadro('Quadro de fases', 'lotes de cada produto em cada fase',
       [grade(colFases, linhasFase),
        reg('Saldo de ALV', [calc(function (r) { return n(r.ind.alvFolga, 0) + ' m²'; }),
          calc(function (r) { return r.ind.alvFolga >= -0.5 ? 'cabe na gleba' : 'NÃO CABE'; }, 'fraco')],
          'Lotes e área do lote são travados por este saldo.', true)],
-      'Só as fases ativas entram no cálculo. A distribuição não precisa ser igual entre fases — normalmente não é.'));
+      'O quadro mostra as fases habilitadas em Eventos e faseamento. A distribuição não precisa ser igual entre fases — normalmente não é.'));
 
     /* 5 — resumo do programa (depende de tudo acima) */
     f.appendChild(quadro('Resumo do programa', 'resultado das premissas acima', [
@@ -682,11 +712,11 @@
       'Valor nominal, distribuído no cronograma acima.'));
     linhasTerreno.push(reg('   parte em permuta',
       [calc(function (r) { return R$(r.ind.vpPermuta); }),
-       calc(function (r) { return pc(r.ind.permutaPct, 2) + ' da receita líq.'; }, 'fraco')],
+       calc(function (r) { return pc(r.ind.permutaPct, 2) + ' da receita'; }, 'fraco')],
       'Valor presente do repasse, à taxa real do terrenista.'));
     linhasTerreno.push(reg('Valor por m² de gleba',
       [calc(function (r) { return R$(r.ind.valorM2Gleba, 2); }),
-       calc(function (r) { return R$(r.ind.valorM2ALV, 2) + '/m² de ALV'; }, 'fraco')], null, true));
+       calc(function (r) { return R$(r.ind.valorM2ALV, 2) + '/m² ALV'; }, 'fraco')], null, true));
     var escala = e('div');
     var btnEscala = e('button', { cls: 'acao-clara', type: 'button',
       txt: 'Calcular a escala de formas de pagamento' });
@@ -753,16 +783,6 @@
   /* =============================================================== VENDAS */
   function folhaVendas(idx) {
     var f = document.createDocumentFragment(), fi = idx;
-    var ativa = function () { return fi < Math.round(P.prazos.nFases); };
-    f.appendChild(e('div', { cls: 'folha-topo' }, [
-      e('span', { cls: 'selo' + (ativa() ? '' : ' off'), txt: ativa() ? 'fase ativa' : 'fase inativa' })
-    ]));
-    if (!ativa()) {
-      f.appendChild(quadro('Fase inativa', null, [
-        e('p', { cls: 'nota-bloco', txt: 'Aumente o número de fases em Premissas › Eventos e faseamento para ativar esta fase. Enquanto inativa, ela não gera obra, vendas nem receita.' })
-      ]));
-      return f;
-    }
     var F = function (r) { return r.fases[fi]; };
 
     f.appendChild(quadro('Eventos', 'início e fim são calculados; só a duração é digitada', [
@@ -1172,20 +1192,28 @@
   /* ================================================================ abas */
   var ABAS = [
     { id: 'premissas', rot: 'Premissas', render: folhaPremissas },
-    { id: 'v1', rot: 'Vendas · Fase 1', render: function () { return folhaVendas(0); } },
-    { id: 'v2', rot: 'Vendas · Fase 2', render: function () { return folhaVendas(1); } },
-    { id: 'v3', rot: 'Vendas · Fase 3', render: function () { return folhaVendas(2); } },
-    { id: 'v4', rot: 'Vendas · Fase 4', render: function () { return folhaVendas(3); } },
+    { id: 'v1', fase: 0, rot: 'Vendas · Fase 1', render: function () { return folhaVendas(0); } },
+    { id: 'v2', fase: 1, rot: 'Vendas · Fase 2', render: function () { return folhaVendas(1); } },
+    { id: 'v3', fase: 2, rot: 'Vendas · Fase 3', render: function () { return folhaVendas(2); } },
+    { id: 'v4', fase: 3, rot: 'Vendas · Fase 4', render: function () { return folhaVendas(3); } },
     { id: 'fluxo', rot: 'Fluxo de caixa', render: folhaFluxo },
     { id: 'drf', rot: 'Demonstrativo', render: folhaDRF },
     { id: 'auditoria', rot: 'Auditoria', render: folhaAuditoria },
     { id: 'memorial', rot: 'Memorial', render: folhaMemorial }
   ];
 
+  /* fase inativa não tem aba: o estudo mostra só o que está em jogo */
+  function abasVisiveis() {
+    var nF = nFasesP();
+    return ABAS.filter(function (a) { return a.fase === undefined || a.fase < nF; });
+  }
+
   function montarAbas() {
     var nav = document.getElementById('abas');
     nav.textContent = '';
-    ABAS.forEach(function (a) {
+    var lista = abasVisiveis();
+    if (!lista.some(function (a) { return a.id === abaAtiva; })) abaAtiva = 'premissas';
+    lista.forEach(function (a) {
       var b = e('button', { cls: 'aba', role: 'tab', 'aria-selected': a.id === abaAtiva ? 'true' : 'false',
         txt: a.rot });
       b.addEventListener('click', function () { abaAtiva = a.id; montarAbas(); montarFolha(); });
@@ -1198,7 +1226,9 @@
     atualizadores = [];
     var alvo = document.getElementById('folha');
     alvo.textContent = '';
-    var aba = ABAS.filter(function (a) { return a.id === abaAtiva; })[0];
+    var lista = abasVisiveis();
+    var aba = lista.filter(function (a) { return a.id === abaAtiva; })[0];
+    if (!aba) { abaAtiva = 'premissas'; aba = lista[0]; }
     alvo.appendChild(aba.render());
     aplicar();
     window.scrollTo(0, manterRolagem ? y : 0);
