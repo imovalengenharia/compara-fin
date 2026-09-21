@@ -708,28 +708,6 @@
         'CDI deflacionado pelo IPCA. É a taxa com que o fluxo de permuta é trazido a valor presente.', true)
     ]));
 
-    /* 12 — janelas */
-    var j = [];
-    function jan(rot, caminho, tipo, nota) {
-      j.push(reg(rot, [inp(caminho, tipo, { step: 1, zero: true }), un(tipo === 'pct' ? '%' : 'mês')], nota));
-    }
-    jan('Registro e ITBI — mês inicial', 'janelas.itbiIni', 'num', 'Mês em que começa o desembolso da aquisição.');
-    jan('Registro e ITBI — nº de parcelas', 'janelas.itbiParc', 'num', 'Em quantas parcelas iguais ele é dividido.');
-    jan('Contrapartidas — meses antes da obra', 'janelas.contrapAnteObra', 'num', 'Negativo: antecede o início da obra da fase.');
-    jan('Contrapartidas — duração', 'janelas.contrapDur', 'num', 'Por quantos meses as obras de contrapartida consomem caixa.');
-    jan('Manutenção — 1ª janela', 'janelas.manutT1', 'num', 'Começa na entrega de cada fase.');
-    j.push(reg('Manutenção — % na 1ª janela', [inp('janelas.manutP1', 'pct'), un('%')],
-      'Fatia gasta na primeira janela; o restante vai para a segunda.'));
-    jan('Manutenção — 2ª janela', 'janelas.manutT2', 'num', 'Duração da segunda janela, que começa quando a primeira termina.');
-    jan('Marketing — meses antes do lançamento', 'janelas.mktAntes', 'num', 'Negativo: antecede o lançamento da fase.');
-    j.push(reg('Marketing — % antes do lançamento', [inp('janelas.mktPctAntes', 'pct'), un('%')],
-      'Fatia gasta na pré-abertura; o restante se dilui ao longo das vendas.'));
-    jan('Marketing — meses após o lançamento', 'janelas.mktDepois', 'num', 'Por quantos meses o marketing segue depois do lançamento.');
-    jan('Stand — meses antes do lançamento', 'janelas.standAntes', 'num', 'Negativo: o stand é montado antes do lançamento.');
-    j.push(reg('Stand — % antes do lançamento', [inp('janelas.standPctAntes', 'pct'), un('%')],
-      'Fatia gasta na montagem; o restante acompanha o período de vendas.'));
-    f.appendChild(quadro('Janelas de desembolso', 'quando cada conta sai do caixa', j,
-      'Correspondem às linhas 1 a 7 do cabeçalho da aba FLUXO da planilha.'));
     return f;
   }
 
@@ -835,14 +813,51 @@
   }
 
   /* ================================================================ FLUXO */
+  /* As chaves de desembolso ficam acima da coluna que governam, como nas
+     primeiras linhas da aba FLUXO da planilha: cada regra ao lado do dinheiro
+     que ela move, e não numa lista à parte. */
+  var CHAVES = {
+    itbi: [['início', 'janelas.itbiIni', 'num', 'Mês em que começa o desembolso da aquisição.'],
+           ['parcelas', 'janelas.itbiParc', 'num', 'Em quantas parcelas iguais ele é dividido.']],
+    contrap: [['antes', 'janelas.contrapAnteObra', 'num', 'Meses antes do início da obra da fase. Negativo antecede a obra.'],
+              ['duração', 'janelas.contrapDur', 'num', 'Por quantos meses as obras de contrapartida consomem caixa.']],
+    manut: [['1ª janela', 'janelas.manutT1', 'num', 'Duração da primeira janela, que começa na entrega de cada fase.'],
+            ['% na 1ª', 'janelas.manutP1', 'pct', 'Fatia gasta na primeira janela; o restante vai para a segunda.'],
+            ['2ª janela', 'janelas.manutT2', 'num', 'Duração da segunda janela, que começa quando a primeira termina.']],
+    marketing: [['antes', 'janelas.mktAntes', 'num', 'Meses antes do lançamento da fase. Negativo antecede o lançamento.'],
+                ['% antes', 'janelas.mktPctAntes', 'pct', 'Fatia gasta na pré-abertura; o restante se dilui ao longo das vendas.'],
+                ['depois', 'janelas.mktDepois', 'num', 'Por quantos meses o marketing segue depois do lançamento.']],
+    stand: [['antes', 'janelas.standAntes', 'num', 'Meses antes do lançamento: o stand é montado antes de vender.'],
+            ['% antes', 'janelas.standPctAntes', 'pct', 'Fatia gasta na montagem; o restante acompanha o período de vendas.']]
+  };
+  function chavesDa(coluna) {
+    var lista = CHAVES[coluna];
+    if (!lista) return null;
+    return e('div', { cls: 'chaves' }, lista.map(function (c) {
+      var campo = inp(c[1], c[2], c[2] === 'pct' ? {} : { step: 1, zero: true });
+      (campo.tagName === 'INPUT' ? campo : campo.querySelector('input')).title = c[3];
+      return e('label', { cls: 'chave', title: c[3] }, [e('span', { cls: 'k', txt: c[0] }), campo]);
+    }));
+  }
+
   function folhaFluxo() {
     var f = document.createDocumentFragment();
-    var box = e('div');
+    var cols = Motor.COLUNAS.concat([['liquida', 'Receita líquida'], ['fluxo', 'Fluxo do mês'],
+                                     ['acum', 'Caixa acumulado']]);
+    /* o cabeçalho tem campos, e campo que sai do documento perde o foco: ele
+       é montado uma vez, e o recálculo troca apenas o corpo da tabela */
+    var trChaves = e('tr', { cls: 'chaves-linha' }, [e('th', { txt: 'chaves' })]);
+    var trRotulos = e('tr', { cls: 'rotulos' }, [e('th', { txt: 'Mês' })]);
+    cols.forEach(function (c) {
+      var ch = chavesDa(c[0]);
+      trChaves.appendChild(e('th', {}, ch ? [ch] : []));
+      trRotulos.appendChild(e('th', { txt: c[1] }));
+    });
+    var corpo = e('tbody');
+    var tabela = e('table', { cls: 'dados compacto' },
+      [e('thead', {}, [trChaves, trRotulos]), corpo]);
+    var nota = e('p', { cls: 'nota-bloco' });
     atualizadores.push(function (r) {
-      box.textContent = '';
-      var cols = Motor.COLUNAS.concat([['liquida', 'Receita líquida'], ['fluxo', 'Fluxo do mês'], ['acum', 'Caixa acumulado']]);
-      var thead = e('tr', {}, [e('th', { txt: 'Mês' })]);
-      cols.forEach(function (c) { thead.appendChild(e('th', { txt: c[1] })); });
       var tb = e('tbody');
       var tot = e('tr', { cls: 'total' }, [e('td', { txt: 'Total' })]);
       cols.forEach(function (c) {
@@ -858,16 +873,17 @@
         });
         tb.appendChild(tr);
       });
-      box.appendChild(e('div', { cls: 'rolagem' }, [e('table', { cls: 'dados compacto' }, [e('thead', {}, [thead]), tb])]));
-      box.appendChild(e('p', { cls: 'nota-bloco',
-        txt: r.meses.length + ' meses de ciclo · exposição máxima de ' + mi(-r.ind.exposicao) + ' no mês ' +
-             r.ind.mesExposicao + ' · payback primário no mês ' + r.ind.payback + '.' }));
+      tabela.replaceChild(tb, tabela.tBodies[0]);
+      nota.textContent = r.meses.length + ' meses de ciclo · exposição máxima de ' +
+        mi(-r.ind.exposicao) + ' no mês ' + r.ind.mesExposicao +
+        ' · payback primário no mês ' + r.ind.payback +
+        '. As chaves acima de cada coluna dizem quando aquela conta sai do caixa — ' +
+        'são as linhas 1 a 7 do cabeçalho da aba FLUXO da planilha.';
     });
-    f.appendChild(box);
+    f.appendChild(e('div', {}, [e('div', { cls: 'rolagem' }, [tabela]), nota]));
     return f;
   }
 
-  /* ========================================================= DEMONSTRATIVO */
   function folhaDRF() {
     var f = document.createDocumentFragment();
     /* o quadro do terreno tem campos, e campo que sai do documento perde o
