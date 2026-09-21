@@ -162,6 +162,20 @@ input.sugerido{color:var(--muted)}
   padding-right:calc(var(--dentro) + var(--sufixo) + 1px);font-variant-numeric:tabular-nums}
 .reg>.val>.calc{display:block;width:100%}
 .calc.txt{padding-right:var(--dentro)}
+/* moeda e unidade do valor calculado ocupam as mesmas posições que ocupam
+   dentro de um campo digitável — daí os dígitos alinharem entre os dois */
+.calc>.pre:empty,.calc>.suf:empty{display:none}
+.calc>.pre{margin-right:4px}
+.calc>.suf{margin-left:4px;color:var(--muted)}
+.reg>.val>.calc,table.grade td>.calc{position:relative}
+.reg>.val>.calc>.pre,table.grade td>.calc>.pre,
+.reg>.val>.calc>.suf,table.grade td>.calc>.suf{position:absolute;top:0;height:100%;margin:0;
+  display:flex;align-items:center}
+.reg>.val>.calc>.pre,table.grade td>.calc>.pre{left:var(--dentro);color:var(--muted)}
+.reg>.val>.calc>.suf,table.grade td>.calc>.suf{right:var(--dentro)}
+/* a folga à esquerda cobre a moeda com um respiro; mais do que isso e um
+   valor de oito dígitos não caberia entre ela e a folga do sufixo */
+.reg>.val>.calc.com-pre,table.grade td>.calc.com-pre{padding-left:calc(var(--dentro) + 17px)}
 .calc.fraco{color:var(--muted)}
 
 /* ---------- grades: herdam a mesma grade dos registros ---------- */

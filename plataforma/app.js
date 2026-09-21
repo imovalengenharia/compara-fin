@@ -399,15 +399,25 @@
   }
 
   /* valor calculado: registra-se para ser atualizado a cada recálculo */
+  /* Valor calculado que é um número com moeda ou unidade é escrito em três
+     peças — prefixo, dígitos e sufixo — nas mesmas posições que o campo
+     digitável usa. Assim os dígitos de uma coluna caem sempre no mesmo x,
+     tenham eles unidade ou não. */
+  var NUMERO = /^(R\$ )?(-?[\d.,]+)( m²| %| M)?$/;
   function calc(fn, cls) {
     var el = e('span', { cls: 'calc' + (cls ? ' ' + cls : '') });
+    var pre = e('span', { cls: 'pre' }), num = e('span'), suf = e('span', { cls: 'suf' });
+    el.appendChild(pre); el.appendChild(num); el.appendChild(suf);
     atualizadores.push(function (r) {
-      var t = fn(r);
-      el.textContent = t;
+      var t = String(fn(r)).trim(), m = NUMERO.exec(t);
+      pre.textContent = m && m[1] ? 'R$' : '';
+      num.textContent = m ? m[2] : t;
+      suf.textContent = m && m[3] ? m[3].trim() : '';
+      el.classList.toggle('com-pre', !!(m && m[1]));
       /* só o que é número guarda a folga do afixo à direita; texto usa a
          célula inteira, senão quebra linha à toa */
-      el.classList.toggle('txt', !/^[-\dR—]/.test(String(t).trim()));
-      el.classList.toggle('nulo', String(t).trim() === VAZIO);
+      el.classList.toggle('txt', !m && !/^[-\d—]/.test(t));
+      el.classList.toggle('nulo', t === VAZIO);
     });
     return el;
   }
@@ -576,7 +586,7 @@
       { rot: 'Preço de venda por m²', cels: idxP.map(function (i) {
           return inp('produtos.' + i + '.precoM2', 'num', { un: 'R$' }); }) },
       { rot: 'Preço do lote', cels: idxP.map(function (i) {
-          return calc(function (r) { return r.prog.prods[i].precoLote ? n(r.prog.prods[i].precoLote, 0) : '—'; }); }) },
+          return calc(function (r) { return R$(r.prog.prods[i].precoLote); }); }) },
       { rot: 'Forma de pagamento', cels: idxP.map(function (i) {
           return P.produtos[i].tipo === 'comercial'
             ? inp('produtos.' + i + '.pagamento', 'sel', { opcoes: opcoesPagamento() })
@@ -598,7 +608,7 @@
     linhasFase.push({ rot: 'Lotes totais da fase', forte: true, cels: fasesAtivas.map(function (fa) {
       return calc(function (r) { return n(r.prog.fases[fa].totalLotes, 0); }); }) });
     linhasFase.push({ rot: 'VGV da fase', forte: true, cels: fasesAtivas.map(function (fa) {
-      return calc(function (r) { return n(r.prog.fases[fa].vgv, 0); }); }) });
+      return calc(function (r) { return R$(r.prog.fases[fa].vgv); }); }) });
     linhasFase.push({ rot: 'ALV da fase', cels: fasesAtivas.map(function (fa) {
       return calc(function (r) { return n(r.prog.fases[fa].alv, 0) + ' m²'; }); }) });
     f.appendChild(quadro('Quadro de fases', 'lotes de cada produto em cada fase',
