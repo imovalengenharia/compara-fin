@@ -20,10 +20,10 @@
       prazos: { preOp: 18, nFases: 1 },
       produtos: [
         { tipo: 'residencial', area: 391.406, precoM2: 1250, pagamento: 'mix', momento: 'Intermediário' },
-        { tipo: 'comercial', area: 800, precoM2: 1250, pagamento: 'avista', momento: 'Intermediário' },
-        { tipo: 'comercial', area: 85, precoM2: 1250, pagamento: 'avista', momento: 'Início' },
-        { tipo: 'comercial', area: 85, precoM2: 1250, pagamento: 'avista', momento: 'Intermediário' },
-        { tipo: 'comercial', area: 85, precoM2: 1250, pagamento: 'avista', momento: 'Fim' }],
+        { tipo: 'comercial', area: 800, precoM2: 1250, pagamento: 'p1', momento: 'Intermediário' },
+        { tipo: 'comercial', area: 85, precoM2: 1250, pagamento: 'p1', momento: 'Início' },
+        { tipo: 'comercial', area: 85, precoM2: 1250, pagamento: 'p1', momento: 'Intermediário' },
+        { tipo: 'comercial', area: 85, precoM2: 1250, pagamento: 'p1', momento: 'Fim' }],
       quadro: [[164, 0, 0, 0], [1, 0, 0, 0], [4, 0, 0, 0], [4, 0, 0, 0], [2, 0, 0, 0]],
       planos: [{ n: 1, mix: 0.2, entrada: 1, desconto: 0.05, correcao: 0.05, jurosReal: 0 },
                { n: 120, mix: 0.5, entrada: 0.15, desconto: 0, correcao: 0.05, jurosReal: 0.08 },
@@ -531,9 +531,9 @@
     /* O residencial vende por curva: quem manda é o rateio do quadro de planos,
        e não há outra forma a escolher — por isso o campo aparece como valor
        fixo, e não como lista. O comercial é negociado lote a lote, então
-       escolhe entre o preço de tabela à vista e um plano específico. */
+       aponta um dos planos de venda — o plano 1 é o à vista. */
     function opcoesPagamento() {
-      var o = [['avista', 'À vista (tabela)']];
+      var o = [];
       P.planos.forEach(function (pl, i) {
         var q = Math.round(+pl.n || 0);
         if (q < 1) return;
@@ -591,7 +591,7 @@
               ? p.meses.map(function (m) { return 'Fase ' + m.fase + ': mês ' + m.mes; }).join(' · ')
               : '—';
           }, 'fraco'); }) }
-    ], 'Residencial vende ao longo das três janelas da fase, rateado entre os planos conforme o quadro acima. Comercial é negociado em um único mês — Início é o lançamento da fase, Intermediário a entrega da obra e Fim o último mês de vendas — à vista pelo preço de tabela ou por um plano específico.')]));
+    ], 'Residencial vende ao longo das três janelas da fase, rateado entre os planos conforme o quadro acima. Comercial é negociado em um único mês — Início é o lançamento da fase, Intermediário a entrega da obra e Fim o último mês de vendas — pelo plano de venda escolhido, sendo o plano 1 o à vista.')]));
 
     /* 4 — quadro de fases */
     var fasesAtivas = [];
@@ -1256,8 +1256,9 @@
      guardado acompanha, para não sobrar apontando para uma opção que sumiu. */
   function normalizarPagamentos() {
     (P.produtos || []).forEach(function (p) {
-      if (p.tipo === 'comercial') { if (p.pagamento === 'mix') p.pagamento = 'avista'; }
-      else p.pagamento = 'mix';
+      if (p.tipo === 'comercial') {
+        if (!/^p[1-5]$/.test(p.pagamento)) p.pagamento = 'p1';
+      } else p.pagamento = 'mix';
     });
   }
 
