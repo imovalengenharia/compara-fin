@@ -451,8 +451,11 @@
         celulas[1].textContent = u.slice(dentro.length + 1);
       }
     }
+    /* rótulo que começa com espaço é parcela do número de cima: recua, para
+       que a soma se leia como soma */
+    var sub = /^\s/.test(rot);
     var linha = e('div', { cls: 'reg' + (forte ? ' forte' : '') },
-      [e('div', { cls: 'rot', txt: rot })]);
+      [e('div', { cls: 'rot' + (sub ? ' sub' : ''), txt: rot.trim() })]);
     var comp = null;
     if (celulas.length > 3) {
       linha.appendChild(e('div', { cls: 'livre' }, celulas));
@@ -749,9 +752,28 @@
        calc(function (r) { return pc(r.ind.permutaPct) + ' da receita'; }, 'fraco')],
       'Soma dos repasses em moeda da data-base, sem desconto no tempo.'));
     linhasTerreno.push(reg('Equivalente à vista',
-      [calc(function (r) { return R$(r.ind.equivalenteVista); }),
-       calc(function (r) { return R$(r.ind.vpPermuta) + ' de permuta'; }, 'fraco')],
+      [calc(function (r) { return R$(r.ind.equivalenteVista); })],
       'O mesmo negócio trazido a valor presente pela taxa real do terrenista. É a base do ITBI.'));
+    /* No pagamento misto o equivalente à vista é uma soma de três peças, e
+       ela fica escrita: a permuta descontada, o sinal — que já está no mês 0
+       e não desconta — e as parcelas descontadas. Cada peça só aparece
+       quando existe, e nenhuma aparece sozinha: aí a linha acima já diz tudo. */
+    function pecaVista(rot, campo, nota) {
+      var linha = reg(rot, [calc(function (r) { return R$(r.ind[campo]); })], nota);
+      atualizadores.push(function (r) {
+        var pecas = ['vpPermuta', 'vpSinal', 'vpParcelas'].filter(function (k) {
+          return r.ind[k] > 0.5;
+        }).length;
+        linha.style.display = (pecas > 1 && r.ind[campo] > 0.5) ? '' : 'none';
+      });
+      linhasTerreno.push(linha);
+    }
+    pecaVista('   permuta, a valor presente', 'vpPermuta',
+      'Repasses futuros da permuta, descontados à taxa real do terrenista.');
+    pecaVista('   sinal, na assinatura', 'vpSinal',
+      'Pago no mês 0: já está a valor presente, sem desconto.');
+    pecaVista('   parcelas, a valor presente', 'vpParcelas',
+      'Saldo em dinheiro, parcela a parcela, descontado à mesma taxa.');
     linhasTerreno.push(reg('Valor por m² de gleba',
       [calc(function (r) { return R$(r.ind.valorM2Gleba, 2); }),
        calc(function (r) { return R$(r.ind.valorM2ALV, 2) + '/m² ALV'; }, 'fraco')],
@@ -1185,8 +1207,9 @@
       rec('Investimento × exposição máxima de caixa', i.investimento, -i.exposicao, 1,
         'O capital aportado é exatamente o pior saldo acumulado.');
       rec('Retorno × resultado mais investimento', i.retorno, i.resultado + i.investimento, 1);
-      rec('Equivalente à vista × dinheiro mais permuta', i.equivalenteVista, i.vpCaixa + i.vpPermuta, 1,
-        'Ambas as parcelas trazidas à taxa real do terrenista.');
+      rec('Equivalente à vista × permuta, sinal e parcelas', i.equivalenteVista,
+        i.vpPermuta + i.vpSinal + i.vpParcelas, 1,
+        'O sinal entra no mês 0; permuta e parcelas vêm descontadas à taxa real do terrenista.');
       rec('Mix dos planos de venda', P.planos.reduce(function (a, b) { return a + (+b.mix || 0); }, 0) * 100, 100, 0.01, 'em %');
       r.fases.forEach(function (fa, k) {
         rec('Curva de obra da fase ' + fa.i, soma(fa.etapas.map(function (x) { return x.pct; })) * 100, 100, 0.01, 'em %');
@@ -1270,13 +1293,21 @@
     lista.forEach(function (a) {
       var b = e('button', { cls: 'aba', role: 'tab', 'aria-selected': a.id === abaAtiva ? 'true' : 'false',
         txt: a.rot });
-      b.addEventListener('click', function () { abaAtiva = a.id; montarAbas(); montarFolha(); });
+      b.addEventListener('click', function () {
+        if (a.id === abaAtiva) return;
+        rolagem[abaAtiva] = window.scrollY;
+        abaAtiva = a.id; montarAbas(); montarFolha();
+      });
       nav.appendChild(b);
     });
   }
 
+  /* cada aba guarda onde a leitura parou: voltar para ela volta para o
+     mesmo ponto, e não para o topo */
+  var rolagem = {};
+
   function montarFolha(manterRolagem) {
-    var y = window.scrollY;
+    var y = manterRolagem ? window.scrollY : (rolagem[abaAtiva] || 0);
     atualizadores = [];
     var alvo = document.getElementById('folha');
     alvo.textContent = '';
@@ -1285,7 +1316,7 @@
     if (!aba) { abaAtiva = 'premissas'; aba = lista[0]; }
     alvo.appendChild(aba.render());
     aplicar();
-    window.scrollTo(0, manterRolagem ? y : 0);
+    window.scrollTo(0, y);
   }
 
   function aplicar() {
@@ -1407,7 +1438,7 @@
       aplicarTema(document.documentElement.getAttribute('data-tema') === 'claro' ? 'escuro' : 'claro');
     });
     document.getElementById('btn-restaurar').addEventListener('click', function () {
-      P = premissasPadrao(); recalcular(); montarFolha();
+      P = premissasPadrao(); rolagem = {}; recalcular(); montarFolha();
     });
     document.getElementById('btn-json').addEventListener('click', function () {
       baixar('premissas-involutivo.json', JSON.stringify(P, null, 2), 'application/json');

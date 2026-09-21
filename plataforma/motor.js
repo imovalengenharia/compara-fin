@@ -400,7 +400,8 @@
     return { col: col, liquida: liquida, fluxo: fluxo, acum: acum, obraFase: obraFase,
              valores: { obraTotal: obraTotal, preOpV: preOpV, obraExec: obraExec, itbiV: itbiV,
                         contrapV: contrapV, manutV: manutV, mktV: mktV, standV: standV,
-                        admV: admV, bancV: bancV, cgaV: cgaV, aquisicao: aquisicao } };
+                        admV: admV, bancV: bancV, cgaV: cgaV, aquisicao: aquisicao,
+                        sinalPago: sinal } };
   }
 
   /* Fluxo do investidor, na mesma construção das colunas AR..AW da planilha:
@@ -517,6 +518,10 @@
       /* o valor presente do dinheiro sai do próprio fluxo, que já está em
          moeda da base — não depende de o desembolso ser linear no valor */
       M.vpCaixa = Math.abs(vpl(M.col.terreno, taxaTerrenista));
+      /* o sinal está no mês 0: já é valor presente. O resto do dinheiro são as
+         parcelas, e o que sobra do valor presente do caixa é o que elas valem hoje */
+      M.vpSinal = M.valores.sinalPago;
+      M.vpParcelas = Math.max(0, M.vpCaixa - M.vpSinal);
       /* duas medidas do mesmo negócio: o que o terrenista recebe ao longo do
          tempo, em moeda da base, e o que isso vale hoje à taxa dele */
       M.permutaNominal = M.col.permuta.reduce(function (a, x) { return a + Math.abs(x); }, 0);
@@ -676,6 +681,7 @@
         valorTerreno: M.valorTerreno, equivalenteVista: M.equivalenteVista,
         permutaNominal: M.permutaNominal,
         caixaTerreno: M.caixaTerreno, vpCaixa: M.vpCaixa,
+        vpSinal: M.vpSinal, vpParcelas: M.vpParcelas,
         formaTerreno: T.forma, modoTerreno: T.modo,
         pctDinheiroEfetivo: M.equivalenteVista > 0 ? M.vpCaixa / M.equivalenteVista : 0,
         excedePermuta: excedePermuta,
