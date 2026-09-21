@@ -460,7 +460,7 @@
      Como nas destinações da gleba, a sugestão entra na conta de verdade —
      o que o avaliador não informou o modelo assume, e a tela diz qual é. */
   var USUAIS = {
-    'custos.impostos': 0.0673, 'custos.comissoes': 0.045, 'custos.contrapartidas': 0.025,
+    'custos.impostos': 0.067, 'custos.comissoes': 0.045, 'custos.contrapartidas': 0.025,
     'custos.outrosTerreno': 0.02, 'custos.obraM2': 300, 'custos.obraPctVGV': 0.20,
     'custos.pctPreOp': 0.08,
     'custos.cga': 0.03, 'custos.gerenciamento': 0.06, 'custos.manutencao': 0.01,

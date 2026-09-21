@@ -16,7 +16,7 @@
       areas: { tipo: 'aberto', gleba: 160084,
                aberto:     { circulacao: null, verdeLazer: null, institucional: null },
                condominio: { circulacao: null, verdeLazer: null, institucional: null },
-               app: 0.1288136228480048, faixa: 14408, restricao: 0 },
+               app: 0.129, faixa: 14408, restricao: 0 },
       prazos: { preOp: 18, nFases: 1 },
       produtos: [
         { tipo: 'residencial', area: 391.406, precoM2: 1250, pagamento: 'mix', momento: 'Intermediário' },
@@ -64,8 +64,11 @@
   var R$ = function (v, d) { d = d === undefined ? 0 : d;
     return vazio(v, d) ? VAZIO : 'R$ ' + nz(v, d); };
   var mi = function (v) { return vazio(v / 1e6, 1) ? VAZIO : 'R$ ' + nz(v / 1e6, 1) + ' M'; };
-  var pc = function (v, d) { d = d === undefined ? 1 : d;
-    return vazio(v * 100, d) ? VAZIO : nz(v * 100, d) + '\u00A0%'; };
+  /* percentual se escreve com uma casa em toda a plataforma, no valor
+     calculado e no campo digitável — o que se vê é o que entra na conta */
+  var CASAS_PCT = 1;
+  var pc = function (v) {
+    return vazio(v * 100, CASAS_PCT) ? VAZIO : nz(v * 100, CASAS_PCT) + '\u00A0%'; };
   var mes = function (v) { return v === null || v === undefined ? VAZIO : 'mês ' + nz(v, 0); };
 
   /* Campos numéricos seguem o padrão brasileiro: ponto separa o milhar,
@@ -91,27 +94,36 @@
   }
   /* Formata o que está sendo digitado sem mexer no que ainda falta digitar:
      agrupa o milhar da parte inteira e preserva a vírgula e os decimais. */
-  function fmtCampo(txt, inteiro) {
+  function fmtCampo(txt, inteiro, casas) {
     var s = String(txt == null ? '' : txt);
     var neg = /-/.test(s);
     s = s.replace(/[^\d,]/g, '');
     var i = inteiro ? -1 : s.indexOf(',');
     var int = i >= 0 ? s.slice(0, i) : s;
-    var dec = i >= 0 ? s.slice(i + 1).replace(/\D/g, '').slice(0, 6) : null;
+    var dec = i >= 0 ? s.slice(i + 1).replace(/\D/g, '').slice(0, casas === undefined ? 6 : casas) : null;
     int = int.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
     var agrupado = int.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
     if (!agrupado && dec === null) return neg ? '-' : '';
     return (neg ? '-' : '') + (agrupado || '0') + (dec === null ? '' : ',' + dec);
   }
-  function porNum(v, inteiro) {
+  function porNum(v, inteiro, casas) {
     if (v === null || v === undefined || !isFinite(v)) return '';
-    if (Math.abs(v) < 1e-9) return VAZIO;
-    return fmtCampo(String(Math.round(v * 1e6) / 1e6).replace('.', ','), inteiro);
+    var minimo = casas === undefined ? 1e-9 : 0.5 / Math.pow(10, casas);
+    if (Math.abs(v) < minimo) return VAZIO;
+    var txt = casas === undefined ? String(Math.round(v * 1e6) / 1e6) : v.toFixed(casas);
+    return fmtCampo(txt.replace('.', ','), inteiro, casas);
   }
   /* Um campo que ainda mostra o número sugerido pela plataforma é escrito em
      letra mais clara. Assim que o avaliador digita um valor diferente, ele
      passa a ser dado dele e ganha a cor cheia. */
   function semValor(v) { return v === null || v === undefined || v === ''; }
+  function casasDe(tipo) { return tipo === 'pct' ? CASAS_PCT : undefined; }
+  /* premissa por informar vale o usual: a tela lê o mesmo que o motor usa */
+  var pcFino = function (v, d) { return nz(v * 100, d === undefined ? 4 : d) + '\u00A0%'; };
+  function usual(caminho) {
+    var v = pegar(caminho);
+    return semValor(v) ? Motor.USUAIS[caminho] : v;
+  }
   /* Enquanto a premissa não for informada, o campo mostra o número sugerido
      em letra clara e o modelo calcula com ele. Digitar um valor — ainda que
      igual ao sugerido — torna a premissa sua, e a letra fica cheia. Apagar o
@@ -120,7 +132,7 @@
     var sug = el.dataset.sugerido, g = pegar(caminho);
     var usa = sug !== undefined && semValor(g);
     var v = usa ? +sug : g;
-    el.value = porNum(tipo === 'pct' ? (v || 0) * 100 : v, inteiro);
+    el.value = porNum(tipo === 'pct' ? (v || 0) * 100 : v, inteiro, casasDe(tipo));
     el.classList.toggle('sugerido', usa);
   }
 
@@ -129,7 +141,8 @@
     var antes = el.value, pos = el.selectionStart;
     if (pos === null) pos = antes.length;
     var digitos = antes.slice(0, pos).replace(/[^\d,]/g, '').length;
-    var depois = fmtCampo(antes, el.dataset.inteiro === '1');
+    var depois = fmtCampo(antes, el.dataset.inteiro === '1',
+      el.dataset.tipo === 'pct' ? CASAS_PCT : undefined);
     if (depois === antes) return;
     el.value = depois;
     var i = 0, d = 0;
@@ -309,7 +322,7 @@
         var lim = null;
         if (el.dataset.max !== undefined && v > +el.dataset.max) lim = +el.dataset.max;
         if (ev.type === 'change' && el.dataset.min !== undefined && v < +el.dataset.min) lim = +el.dataset.min;
-        if (lim !== null) { v = lim; el.value = porNum(t === 'pct' ? v * 100 : v, el.dataset.inteiro === '1'); }
+        if (lim !== null) { v = lim; el.value = porNum(t === 'pct' ? v * 100 : v, el.dataset.inteiro === '1', casasDe(t)); }
         el.classList.remove('sugerido');
       }
     }
@@ -515,16 +528,16 @@
           calc(function (r) { return n(r.areas.perdas[i].m2, 0) + ' m²'; }, 'fraco')], d.nota));
       } else {
         areas.push(reg(d.rotuloN, [inp(caminho, 'num'), un('m²'),
-          calc(function (r) { return pc(r.areas.perdas[i].pct, 2); }, 'fraco')], d.nota));
+          calc(function (r) { return pc(r.areas.perdas[i].pct); }, 'fraco')], d.nota));
       }
     });
     areas.push(reg('8 · Total das destinações (2 a 7)',
       [calc(function (r) { return n(r.areas.totalPerdas, 0) + ' m²'; }),
-       calc(function (r) { return pc(r.areas.pctPerdas, 2); }, 'fraco')],
+       calc(function (r) { return pc(r.areas.pctPerdas); }, 'fraco')],
       'Soma das seis condições acima.', true));
     areas.push(reg('9 · ALV disponível (1 − 8)',
       [calc(function (r) { return n(r.areas.alvDisponivel, 0) + ' m²'; }),
-       calc(function (r) { return pc(r.areas.pctALV, 2); }, 'fraco')],
+       calc(function (r) { return pc(r.areas.pctALV); }, 'fraco')],
       'Área líquida vendável: o que sobra para venda. É o teto físico do programa.', true));
     f.appendChild(quadro('Quadro de áreas', modal.rotulo + ' · destinação · área · % sobre a gleba', areas));
 
@@ -568,7 +581,7 @@
       { rot: 'Correção do preço (a.a.)', cels: idx.map(function (i) { return inp('planos.' + i + '.correcao', 'pct'); }) },
       { rot: 'Juros acima do IPCA (a.a.)', cels: idx.map(function (i) { return inp('planos.' + i + '.jurosReal', 'pct'); }) },
       { rot: 'Juros nominal equivalente', forte: true, cels: idx.map(function (i) {
-          return calc(function (r) { return r.planosProduto[0][i].n > 1 ? pc(r.planosProduto[0][i].jurosNominal, 2) : '—'; }); }) }
+          return calc(function (r) { return r.planosProduto[0][i].n > 1 ? pc(r.planosProduto[0][i].jurosNominal) : '—'; }); }) }
     ], 'A parcela é fixa em moeda nominal, calculada pela Price sobre o preço-base. Preço corrigido até a data da venda.')]));
 
     /* 4 — produtos: residenciais e comerciais no mesmo quadro */
@@ -619,9 +632,9 @@
       reg('ALV disponível', [calc(function (r) { return n(r.areas.alvDisponivel, 0) + ' m²'; })],
         'Vem do quadro de áreas: é o teto físico do programa.'),
       reg('ALV utilizada pelo programa', [calc(function (r) { return n(r.ind.alvUsada, 0) + ' m²'; }),
-        calc(function (r) { return pc(r.areas.alvDisponivel ? r.ind.alvUsada / r.areas.alvDisponivel : 0, 1) + ' do disponível'; }, 'fraco')],
+        calc(function (r) { return pc(r.areas.alvDisponivel ? r.ind.alvUsada / r.areas.alvDisponivel : 0) + ' do disponível'; }, 'fraco')],
         'Soma da área dos lotes lançados nas fases ativas.'),
-      reg('Aproveitamento (ALV / gleba)', [calc(function (r) { return pc(r.ind.aproveitamento, 2); })],
+      reg('Aproveitamento (ALV / gleba)', [calc(function (r) { return pc(r.ind.aproveitamento); })],
         'Quanto da gleba bruta virou área de venda. Mede a eficiência do parcelamento.'),
       reg('Lotes no programa', [calc(function (r) { return n(r.prog.lotes, 0); }),
         calc(function (r) { return n(r.prog.lotesRes, 0) + ' resid. · ' + n(r.prog.lotesCom, 0) + ' com.'; }, 'fraco')],
@@ -639,7 +652,7 @@
       if (Motor.USUAIS[caminho] !== undefined) opts.sugerido = Motor.USUAIS[caminho];
       c.push(reg(rot, [inp(caminho, tipo, opts), un(tipo === 'pct' ? '%' : opts.un || '')], nota));
     }
-    custo('Impostos s/ vendas', 'custos.impostos', 'pct', 'Lucro presumido no regime de caixa — PIS, COFINS, IRPJ e CSLL sobre a receita recebida. Usual de 6,73%; com patrimônio de afetação no RET, 4%.');
+    custo('Impostos s/ vendas', 'custos.impostos', 'pct', 'Lucro presumido no regime de caixa — PIS, COFINS, IRPJ e CSLL sobre a receita recebida. A conta fechada dá 6,73%; com patrimônio de afetação no RET, 4%.');
     custo('Comissões s/ vendas', 'custos.comissoes', 'pct', 'Corretagem sobre o VGV vendido, reconhecida no mês da venda. Usual entre 4% e 6% no loteamento.');
     custo('Contrapartidas', 'custos.contrapartidas', 'pct', 'Obras de interesse público exigidas na aprovação, sobre o VGV. Varia com o município; usual até 3%.');
     custo('Outros custos com terreno', 'custos.outrosTerreno', 'pct', 'ITBI, registro e diligências sobre o equivalente à vista da aquisição. Só o ITBI já costuma ser 2%; some o registro.');
@@ -683,9 +696,9 @@
       reg('INCC', [inp('indices.incc', 'pct'), un('% a.a.')], 'Reajusta obras, gerenciamento e contrapartidas.'),
       reg('CDI', [inp('indices.cdi', 'pct'), un('% a.a.')], 'Referência do custo de oportunidade do capital.'),
       reg('Múltiplo (fator de risco)', [inp('indices.multiplo', 'num'), un('×')], 'Multiplica o CDI para formar a taxa exigida.'),
-      reg('TMA real exigida', [calc(function (r) { return pc(r.ind.tma, 2); }), un('a.a.')],
+      reg('TMA real exigida', [calc(function (r) { return pc(r.ind.tma); }), un('a.a.')],
         '(1 + CDI × múltiplo) ÷ (1 + IPCA) − 1. Real, comparável diretamente com a TIR do modelo.', true),
-      reg('Taxa real do terrenista', [calc(function (r) { return pc(r.ind.taxaTerrenista, 2); }), un('a.a.')],
+      reg('Taxa real do terrenista', [calc(function (r) { return pc(r.ind.taxaTerrenista); }), un('a.a.')],
         'CDI deflacionado pelo IPCA. É a taxa com que o fluxo de permuta é trazido a valor presente.', true)
     ]));
 
@@ -723,11 +736,11 @@
                    : 'Soma do dinheiro e do valor presente da permuta.', true));
     linhasTerreno.push(reg('   parte em dinheiro',
       [calc(function (r) { return R$(r.ind.caixaTerreno); }),
-       calc(function (r) { return pc(r.ind.pctDinheiroEfetivo, 0) + ' do valor'; }, 'fraco')],
+       calc(function (r) { return pc(r.ind.pctDinheiroEfetivo) + ' do valor'; }, 'fraco')],
       'Valor nominal, distribuído no cronograma acima.'));
     linhasTerreno.push(reg('   parte em permuta',
       [calc(function (r) { return R$(r.ind.vpPermuta); }),
-       calc(function (r) { return pc(r.ind.permutaPct, 2) + ' da receita'; }, 'fraco')],
+       calc(function (r) { return pc(r.ind.permutaPct) + ' da receita'; }, 'fraco')],
       'Valor presente do repasse, à taxa real do terrenista.'));
     linhasTerreno.push(reg('Valor por m² de gleba',
       [calc(function (r) { return R$(r.ind.valorM2Gleba, 2); }),
@@ -751,8 +764,8 @@
           'Permuta (% da receita líq.)', 'Investimento requerido', 'Payback'].map(function (t) { return e('th', { txt: t }); }));
         var tb = e('tbody');
         pontos.forEach(function (x) {
-          tb.appendChild(e('tr', {}, [e('td', { txt: pc(x.a, 0) }), e('td', { txt: R$(x.valor) }),
-            e('td', { txt: R$(x.caixa) }), e('td', { txt: pc(x.perm, 2) }),
+          tb.appendChild(e('tr', {}, [e('td', { txt: pc(x.a) }), e('td', { txt: R$(x.valor) }),
+            e('td', { txt: R$(x.caixa) }), e('td', { txt: pc(x.perm) }),
             e('td', { txt: R$(x.inv) }), e('td', { txt: n(x.pb, 0) + ' meses' })]));
         });
         escala.textContent = '';
@@ -842,7 +855,7 @@
             calc(function (r) { return n(F(r).janelas[1].dur, 0); }),
             inp('fases.' + fi + '.durPos', 'num', { step: 1 })] },
         { rot: 'VSO (% ao mês)', forte: true, cels: [0, 1, 2].map(function (i) {
-            return calc(function (r) { return pc(F(r).janelas[i].vso, 2); }); }) }
+            return calc(function (r) { return pc(F(r).janelas[i].vso); }); }) }
       ], 'A janela do lançamento dura o que a janela de lançamento dos eventos; a da obra, o prazo de obra. A venda durante a obra absorve a diferença para o total fechar 100% dos lotes da fase.')]));
 
     f.appendChild(quadro('Gatilho de vendas', null, [
@@ -951,17 +964,17 @@
           e('div', { cls: 'v', txt: R$(i.valorTerreno) }),
           e('div', { cls: 'n', txt: (i.formaTerreno === 'avista' ? 'integralmente à vista, em ' + i.parcelasTerreno +
               (i.parcelasTerreno > 1 ? ' parcelas' : ' parcela') + ' a partir do mês ' + i.mesTerreno
-            : i.formaTerreno === 'permuta' ? 'integralmente em permuta: ' + pc(i.permutaPct, 2) + ' da receita líquida mensal'
-            : R$(i.caixaTerreno) + ' em dinheiro mais permuta de ' + pc(i.permutaPct, 2) + ' da receita líquida') +
-            (i.modoTerreno === 'resolver' ? ' · TIR travada na TMA de ' + pc(i.tma, 2) : '') })
+            : i.formaTerreno === 'permuta' ? 'integralmente em permuta: ' + pc(i.permutaPct) + ' da receita líquida mensal'
+            : R$(i.caixaTerreno) + ' em dinheiro mais permuta de ' + pc(i.permutaPct) + ' da receita líquida') +
+            (i.modoTerreno === 'resolver' ? ' · TIR travada na TMA de ' + pc(i.tma) : '') })
         ]),
         e('div', {}, [e('div', { cls: 'k', txt: 'Por m² de gleba' }),
                       e('div', { cls: 'v', style: 'font-size:26px', txt: R$(i.valorM2Gleba, 2) })])
       ]));
 
       box.appendChild(painel([
-        ['TIR real', i.tir === null ? '—' : pc(i.tir, 2), i.modoTerreno === 'resolver'
-          ? 'travada na TMA de ' + pc(i.tma, 2) : 'a.a. acima do IPCA · TMA ' + pc(i.tma, 2)],
+        ['TIR real', i.tir === null ? '—' : pc(i.tir), i.modoTerreno === 'resolver'
+          ? 'travada na TMA de ' + pc(i.tma) : 'a.a. acima do IPCA · TMA ' + pc(i.tma)],
         ['VPL à TMA', R$(i.vpl), ''],
         ['Resultado', mi(i.resultado), 'margem de ' + pc(i.margemReceita) + ' sobre a receita'],
         ['Investimento requerido', mi(i.investimento), 'exposição máxima no mês ' + i.mesExposicao],
@@ -971,7 +984,7 @@
         ['Ciclo total', n(i.ciclo, 0) + ' meses', 'último recebimento no mês ' + i.ultimoRecebimento],
         ['Resultado por lote', R$(i.resultadoPorLote), ''],
         ['Resultado por m² de ALV', R$(i.resultadoPorM2, 2), ''],
-        ['Registro e ITBI', R$(-r.totais.itbi), pc(P.custos.outrosTerreno, 1) + ' do equivalente à vista']
+        ['Registro e ITBI', R$(-r.totais.itbi), pc(usual('custos.outrosTerreno')) + ' do equivalente à vista']
       ]));
 
       var linhas = [
@@ -1059,13 +1072,13 @@
         ' em ' + num(r.prog.nFases + (r.prog.nFases > 1 ? ' fases' : ' fase')) + ', com VGV de tabela de ' +
         num(R$(i.vgv)) + ' na data-base.');
       p('O estudo devolve resultado de ' + num(R$(i.resultado)) + ' (margem de ' + pc(i.margemReceita) +
-        ' sobre a receita recebida e ' + pc(i.margemVGV) + ' sobre o VGV), TIR real de ' + num(pc(i.tir, 2) + ' a.a.') +
-        ' contra TMA exigida de ' + num(pc(i.tma, 2)) + ', com investimento requerido de ' + num(R$(i.investimento)) +
+        ' sobre a receita recebida e ' + pc(i.margemVGV) + ' sobre o VGV), TIR real de ' + num(pc(i.tir) + ' a.a.') +
+        ' contra TMA exigida de ' + num(pc(i.tma)) + ', com investimento requerido de ' + num(R$(i.investimento)) +
         ' e payback primário no mês ' + num(n(i.payback, 0)) + '.');
       h('2 · Moeda da análise');
       p('Todo o fluxo está no poder de compra do mês zero. Cada conta é primeiro reajustada pelo seu índice contratual ' +
-        '— INCC de ' + num(pc(P.indices.incc, 2)) + ' para obras, gerenciamento e contrapartidas; IPCA de ' +
-        num(pc(P.indices.ipca, 2)) + ' para serviços; sem reajuste para terreno e ITBI — e depois dividida pelo IPCA ' +
+        '— INCC de ' + num(pc(P.indices.incc)) + ' para obras, gerenciamento e contrapartidas; IPCA de ' +
+        num(pc(P.indices.ipca)) + ' para serviços; sem reajuste para terreno e ITBI — e depois dividida pelo IPCA ' +
         'acumulado até aquele mês. Por isso a TIR é real, acima do IPCA, e só pode ser comparada com uma TMA também real.');
       h('3 · Produto e estratégia comercial');
       p('Preço médio de ' + num(R$(i.precoMedioM2, 2) + '/m²') + ' de ALV, equivalente a ' + num(R$(i.precoMedioLote)) +
@@ -1076,7 +1089,7 @@
           ' vendido: a cadeia resultante põe os lançamentos nos meses ' + F.map(function (x) { return x.lanc; }).join(', ') + '.'
           : 'Com uma única fase, o gatilho de ' + pc(F[0].gatilho) + ' não tem efeito prático.'));
       p('O mix de planos distribui as unidades entre ' + P.planos.filter(function (x) { return x.mix > 0; })
-        .map(function (x) { return pc(x.mix, 0) + ' em ' + (x.n > 1 ? x.n + 'x' : 'à vista'); }).join(', ') +
+        .map(function (x) { return pc(x.mix) + ' em ' + (x.n > 1 ? x.n + 'x' : 'à vista'); }).join(', ') +
         '. A carteira resultante tem duration de ' + num(n(i.duration, 1) + ' meses') + ' e o último recebimento cai no mês ' +
         num(n(i.ultimoRecebimento, 0)) + '.');
       h('4 · Onde o dinheiro é aplicado');
@@ -1091,18 +1104,18 @@
       h('5 · Valor da gleba');
       p('O pagamento da gleba está estruturado ' + (i.formaTerreno === 'avista' ? 'integralmente à vista'
           : i.formaTerreno === 'permuta' ? 'integralmente em permuta financeira'
-          : 'em regime misto: ' + pc(i.pctDinheiroEfetivo, 0) + ' em dinheiro e o restante em permuta') +
+          : 'em regime misto: ' + pc(i.pctDinheiroEfetivo) + ' em dinheiro e o restante em permuta') +
         ', o que equivale a ' + num(R$(i.valorTerreno)) + ' à vista — ou ' +
         num(R$(i.valorM2Gleba, 2) + '/m²') + ' de gleba. A parcela em permuta, de ' +
-        num(pc(i.permutaPct, 2)) + ' da receita líquida mensal, vale ' + num(R$(i.vpPermuta)) +
-        ' trazida pela taxa real do terrenista de ' + num(pc(i.taxaTerrenista, 2) + ' a.a.') + '. ' +
+        num(pc(i.permutaPct)) + ' da receita líquida mensal, vale ' + num(R$(i.vpPermuta)) +
+        ' trazida pela taxa real do terrenista de ' + num(pc(i.taxaTerrenista) + ' a.a.') + '. ' +
         (i.modoTerreno === 'resolver'
           ? 'Como o percentual foi resolvido para zerar o VPL na TMA, esse é o teto que o empreendimento suporta pagar pela terra.'
           : 'O percentual está travado no valor informado, e o retorno acima da TMA é o que sobra para o empreendedor.'));
       h('6 · Base metodológica');
       p('Análise da Qualidade do Investimento no padrão NRE-POLI/USP: fluxo em moeda da base, taxa de retorno real, ' +
         'payback primário, duration e reconhecimento pelo regime de caixa. O modelo é 100% capital próprio — a TIR de ' +
-        num(pc(i.tir, 2)) + ' é desalavancada. Nenhum número é digitado no fluxo: todos derivam das premissas.');
+        num(pc(i.tir)) + ' é desalavancada. Nenhum número é digitado no fluxo: todos derivam das premissas.');
     });
     f.appendChild(box);
     return f;
@@ -1122,8 +1135,8 @@
       var travada = i.modoTerreno === 'resolver';
       box.appendChild(quadro('Trava da TIR', travada ? 'o valor do terreno zera o fluxo' : 'valor do terreno informado', [
         painel([
-          ['TIR real do empreendimento', i.tir === null ? '—' : pc(i.tir, 4), 'a.a. acima do IPCA'],
-          ['TMA real exigida', pc(i.tma, 4), '(1 + CDI × múltiplo) ÷ (1 + IPCA) − 1'],
+          ['TIR real do empreendimento', i.tir === null ? '—' : pcFino(i.tir), 'a.a. acima do IPCA'],
+          ['TMA real exigida', pcFino(i.tma), '(1 + CDI × múltiplo) ÷ (1 + IPCA) − 1'],
           ['Diferença', i.tir === null ? '—' : n((i.tir - i.tma) * 100, 4) + ' p.p.', travada ? 'deve ser zero' : 'folga sobre a taxa exigida'],
           ['VPL à TMA', R$(i.vpl), travada ? 'deve ser zero' : 'valor criado acima da TMA']
         ])
@@ -1260,7 +1273,7 @@
     var topo = document.getElementById('resumo-topo');
     topo.textContent = '';
     [['Valor da gleba', R$(R.ind.valorTerreno)],
-     ['TIR real', R.ind.tir === null ? '—' : pc(R.ind.tir, 2) + (R.ind.modoTerreno === 'resolver' ? ' = TMA' : '')],
+     ['TIR real', R.ind.tir === null ? '—' : pc(R.ind.tir) + (R.ind.modoTerreno === 'resolver' ? ' = TMA' : '')],
      ['Resultado', mi(R.ind.resultado)], ['Investimento', mi(R.ind.investimento)]].forEach(function (d) {
       topo.appendChild(e('div', {}, [e('span', { cls: 'r', txt: d[0] }), e('span', { cls: 'v', txt: d[1] })]));
     });
