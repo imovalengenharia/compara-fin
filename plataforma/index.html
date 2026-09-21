@@ -232,13 +232,15 @@ table.dados.compacto thead tr.chaves-linha th:first-child{text-align:left;paddin
   font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--acento);
   vertical-align:bottom}
 table.dados.compacto thead tr.rotulos th{top:64px}
-.chaves{display:flex;flex-direction:column;gap:2px;align-items:flex-end}
-.chave{display:flex;align-items:center;gap:4px;justify-content:flex-end;white-space:nowrap;cursor:text}
+/* todo campo da faixa tem a mesma largura e a mesma borda direita: com ou
+   sem sufixo, mês ou percentual, os campos de uma coluna ficam simétricos */
+.chaves{display:flex;flex-direction:column;gap:2px;align-items:flex-end;--chave:46px}
+.chave{display:flex;align-items:center;gap:5px;justify-content:flex-end;white-space:nowrap;cursor:text}
 .chave>.k{font-size:8.5px;color:var(--muted);line-height:1}
-.chave input{width:34px;height:17px;padding:0 4px;font-size:9.5px;border-radius:2px;line-height:1}
-.chave input.com-sufixo{width:48px}
-.chave .campo{width:auto}
-.chave input.num.com-sufixo{padding-right:12px}
+.chave input,.chave .campo{width:var(--chave);min-width:var(--chave)}
+.chave input{height:17px;padding:0 4px;font-size:9.5px;border-radius:2px;line-height:1}
+.chave .campo>input{width:100%;min-width:0}
+.chave input.num.com-sufixo{padding-right:13px}
 .chave .campo>.sufixo{height:17px;right:3px;font-size:9px}
 table.dados.compacto td:first-child{padding-left:12px}
 table.dados tr:hover td{background:var(--rule-soft)}

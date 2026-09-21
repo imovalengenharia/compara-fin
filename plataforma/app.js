@@ -818,12 +818,12 @@
      que ela move, e não numa lista à parte. */
   var CHAVES = {
     itbi: [['início', 'janelas.itbiIni', 'num', 'Mês em que começa o desembolso da aquisição.'],
-           ['parcelas', 'janelas.itbiParc', 'num', 'Em quantas parcelas iguais ele é dividido.']],
+           ['parc.', 'janelas.itbiParc', 'num', 'Em quantas parcelas iguais ele é dividido.']],
     contrap: [['antes', 'janelas.contrapAnteObra', 'num', 'Meses antes do início da obra da fase. Negativo antecede a obra.'],
-              ['duração', 'janelas.contrapDur', 'num', 'Por quantos meses as obras de contrapartida consomem caixa.']],
-    manut: [['1ª janela', 'janelas.manutT1', 'num', 'Duração da primeira janela, que começa na entrega de cada fase.'],
-            ['% na 1ª', 'janelas.manutP1', 'pct', 'Fatia gasta na primeira janela; o restante vai para a segunda.'],
-            ['2ª janela', 'janelas.manutT2', 'num', 'Duração da segunda janela, que começa quando a primeira termina.']],
+              ['dur.', 'janelas.contrapDur', 'num', 'Por quantos meses as obras de contrapartida consomem caixa.']],
+    manut: [['1ª jan.', 'janelas.manutT1', 'num', 'Duração da primeira janela, que começa na entrega de cada fase.'],
+            ['% 1ª', 'janelas.manutP1', 'pct', 'Fatia gasta na primeira janela; o restante vai para a segunda.'],
+            ['2ª jan.', 'janelas.manutT2', 'num', 'Duração da segunda janela, que começa quando a primeira termina.']],
     marketing: [['antes', 'janelas.mktAntes', 'num', 'Meses antes do lançamento da fase. Negativo antecede o lançamento.'],
                 ['% antes', 'janelas.mktPctAntes', 'pct', 'Fatia gasta na pré-abertura; o restante se dilui ao longo das vendas.'],
                 ['depois', 'janelas.mktDepois', 'num', 'Por quantos meses o marketing segue depois do lançamento.']],
