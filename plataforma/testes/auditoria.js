@@ -133,8 +133,11 @@ function coerencia(r, etiqueta) {
     soma(r.resultadoFase.map(function (f) { return f.resultado; })), i.resultado, { abs: 1 });
   conferir(etiqueta + ' · investimento = exposição máxima', i.investimento, -i.exposicao, { abs: 1 });
   conferir(etiqueta + ' · retorno = resultado + investimento', i.retorno, i.resultado + i.investimento, { abs: 1 });
-  conferir(etiqueta + ' · valor do terreno = caixa (VP) + permuta (VP)', i.valorTerreno,
+  conferir(etiqueta + ' · equivalente à vista = caixa (VP) + permuta (VP)', i.equivalenteVista,
     i.vpCaixa + i.vpPermuta, { abs: 1 });
+  conferir(etiqueta + ' · valor da gleba = dinheiro + permuta nominal', i.valorTerreno,
+    i.caixaTerreno + i.permutaNominal, { abs: 1 });
+  conferir(etiqueta + ' · nominal não é menor que o presente', i.valorTerreno >= i.equivalenteVista - 1, true);
   conferir(etiqueta + ' · ITBI = 2% do equivalente à vista', -T.itbi,
     0.02 * (i.caixaTerreno + i.vpPermuta) * Math.pow(1.035, -1 / 12), { rel: 0.001 });
   conferir(etiqueta + ' · receita = residencial + comercial', T.receita,
@@ -163,13 +166,13 @@ formas.forEach(function (f) {
 
 /* ============================ 3 · COMPORTAMENTO ECONÔMICO =============== */
 B('3 · COMPORTAMENTO ECONÔMICO — o modelo responde na direção certa');
-var vP = resolvidos['permuta'].ind.valorTerreno;
-var vV = resolvidos['avista'].ind.valorTerreno;
-var vM = resolvidos['misto com R$ 8 M em dinheiro'].ind.valorTerreno;
+var vP = resolvidos['permuta'].ind.equivalenteVista;
+var vV = resolvidos['avista'].ind.equivalenteVista;
+var vM = resolvidos['misto com R$ 8 M em dinheiro'].ind.equivalenteVista;
 console.log('  permuta pura R$ ' + fmt(vP) + '  ·  misto R$ ' + fmt(vM) + '  ·  à vista R$ ' + fmt(vV));
 conferir('pagar à vista reduz o teto (antecipa o desembolso)', vV < vP, true);
 conferir('o misto fica entre os dois extremos', vM < vP && vM > vV, true);
-function teto(over) { return Motor.calcular(ITU(over)).ind.valorTerreno; }
+function teto(over) { return Motor.calcular(ITU(over)).ind.equivalenteVista; }
 var base = teto(function () {});
 conferir('obra +10% reduz o teto', teto(function (P) { P.custos.obraM2 = 330; }) < base, true);
 conferir('preço +10% aumenta o teto', teto(function (P) {
@@ -182,7 +185,7 @@ var escala = [0, 4e6, 8e6, 12e6].map(function (d) {
   return Motor.calcular(ITU(function (P) {
     P.terreno = { modo: 'resolver', forma: d === 0 ? 'permuta' : 'misto',
                   valorDinheiro: d, sinal: 0, permutaPct: 0 };
-  })).ind.valorTerreno;
+  })).ind.equivalenteVista;
 });
 var monotona = escala.every(function (v, i) { return i === 0 || v <= escala[i - 1] + 1; });
 conferir('teto cai monotonicamente conforme sobe o dinheiro', monotona, true);
@@ -194,7 +197,7 @@ var volta = Motor.calcular(ITU(function (P) {
   P.terreno = { modo: 'informado', forma: 'misto', sinal: 0,
                 valorDinheiro: res.ind.caixaTerreno, permutaPct: res.ind.permutaPct };
 }));
-conferir('mesmo valor de terreno', volta.ind.valorTerreno, res.ind.valorTerreno, { rel: 0.001 });
+conferir('mesmo valor de terreno', volta.ind.equivalenteVista, res.ind.equivalenteVista, { rel: 0.001 });
 conferir('mesma TIR', volta.ind.tir * 100, res.ind.tir * 100, { abs: 0.01 });
 conferir('mesmo resultado', volta.ind.resultado, res.ind.resultado, { rel: 0.001 });
 

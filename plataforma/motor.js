@@ -517,7 +517,11 @@
       /* o valor presente do dinheiro sai do próprio fluxo, que já está em
          moeda da base — não depende de o desembolso ser linear no valor */
       M.vpCaixa = Math.abs(vpl(M.col.terreno, taxaTerrenista));
-      M.valorTerreno = M.vpCaixa + vp;
+      /* duas medidas do mesmo negócio: o que o terrenista recebe ao longo do
+         tempo, em moeda da base, e o que isso vale hoje à taxa dele */
+      M.permutaNominal = M.col.permuta.reduce(function (a, x) { return a + Math.abs(x); }, 0);
+      M.valorTerreno = caixa + M.permutaNominal;
+      M.equivalenteVista = M.vpCaixa + vp;
       return M;
     }
     function vplDo(M) {
@@ -669,8 +673,11 @@
         precoMedioLote: prog.lotes > 0 ? prog.vgv / prog.lotes : 0,
         precoMedioM2: prog.alv > 0 ? prog.vgv / prog.alv : 0,
         permutaPct: permPct, vpPermuta: M.vpPermuta, taxaTerrenista: taxaTerrenista,
-        valorTerreno: M.valorTerreno, caixaTerreno: M.caixaTerreno, vpCaixa: M.vpCaixa,
-        formaTerreno: T.forma, modoTerreno: T.modo, pctDinheiroEfetivo: M.valorTerreno > 0 ? M.vpCaixa / M.valorTerreno : 0,
+        valorTerreno: M.valorTerreno, equivalenteVista: M.equivalenteVista,
+        permutaNominal: M.permutaNominal,
+        caixaTerreno: M.caixaTerreno, vpCaixa: M.vpCaixa,
+        formaTerreno: T.forma, modoTerreno: T.modo,
+        pctDinheiroEfetivo: M.equivalenteVista > 0 ? M.vpCaixa / M.equivalenteVista : 0,
         excedePermuta: excedePermuta,
         parcelasTerreno: Math.max(1, Math.round(num(P.janelas.terrenoParc, 1))),
         mesTerreno: num(P.janelas.terrenoIni, 0), sinalTerreno: Math.max(0, num(T.sinal)),

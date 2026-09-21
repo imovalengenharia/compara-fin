@@ -712,8 +712,8 @@
     var linhasTerreno = [
       reg('Modo', [inp('terreno.modo', 'sel', { opcoes: ['resolver', 'informado'], remonta: true })],
         modoResolver
-          ? 'Resolver: a TIR fica travada na TMA e o terreno recebe o que resta das receitas e despesas, até zerar o VPL.'
-          : 'Informado: você trava o que está sendo pago pela terra e o modelo devolve a TIR que sobra.'),
+          ? 'Resolver: informe o que paga em dinheiro e o modelo acha a permuta que trava a TIR na TMA.'
+          : 'Informado: você trava dinheiro e permuta, e o modelo devolve a TIR que sobra.'),
       reg('Forma de pagamento', [inp('terreno.forma', 'sel',
         { opcoes: ['permuta', 'avista', 'misto'], remonta: true })],
         'Permuta: percentual da receita líquida. À vista: só dinheiro, e o modelo devolve quanto cabe. Misto: você define o dinheiro e a permuta absorve o resto.')
@@ -740,18 +740,22 @@
     }
     if (!modoResolver && forma !== 'avista') linhasTerreno.push(reg('Permuta financeira',
       [inp('terreno.permutaPct', 'pct'), un('%')], 'Percentual da receita líquida mensal.'));
-    linhasTerreno.push(reg('Valor da gleba — equivalente à vista',
+    linhasTerreno.push(reg('Valor da gleba',
       [calc(function (r) { return R$(r.ind.valorTerreno); })],
-      modoResolver ? 'É o teto: acima disso o empreendimento deixa de remunerar a TMA.'
-                   : 'Soma do dinheiro e do valor presente da permuta.', true));
+      modoResolver ? 'Dinheiro mais permuta, pelo nominal. É o teto: acima disso o empreendimento deixa de remunerar a TMA.'
+                   : 'Dinheiro mais permuta, pelo nominal: o total que o terrenista recebe ao longo do negócio.', true));
     linhasTerreno.push(reg('   parte em permuta',
-      [calc(function (r) { return R$(r.ind.vpPermuta); }),
+      [calc(function (r) { return R$(r.ind.permutaNominal); }),
        calc(function (r) { return pc(r.ind.permutaPct) + ' da receita'; }, 'fraco')],
-      'Valor presente do repasse, à taxa real do terrenista.'));
+      'Soma dos repasses em moeda da data-base, sem desconto no tempo.'));
+    linhasTerreno.push(reg('Equivalente à vista',
+      [calc(function (r) { return R$(r.ind.equivalenteVista); }),
+       calc(function (r) { return R$(r.ind.vpPermuta) + ' de permuta'; }, 'fraco')],
+      'O mesmo negócio trazido a valor presente pela taxa real do terrenista. É a base do ITBI.'));
     linhasTerreno.push(reg('Valor por m² de gleba',
       [calc(function (r) { return R$(r.ind.valorM2Gleba, 2); }),
        calc(function (r) { return R$(r.ind.valorM2ALV, 2) + '/m² ALV'; }, 'fraco')],
-      'Preço unitário da terra: é este número que vai à mesa de negociação.', true));
+      'Valor da gleba dividido pela área: é este número que vai à mesa de negociação.', true));
     var escala = e('div');
     var btnEscala = e('button', { cls: 'acao-clara', type: 'button',
       txt: 'Calcular a escala de formas de pagamento' });
@@ -1122,7 +1126,7 @@
       p('O pagamento da gleba está estruturado ' + (i.formaTerreno === 'avista' ? 'integralmente à vista'
           : i.formaTerreno === 'permuta' ? 'integralmente em permuta financeira'
           : 'em regime misto: ' + pc(i.pctDinheiroEfetivo) + ' em dinheiro e o restante em permuta') +
-        ', o que equivale a ' + num(R$(i.valorTerreno)) + ' à vista — ou ' +
+        ', o que equivale a ' + num(R$(i.equivalenteVista)) + ' à vista — ou ' +
         num(R$(i.valorM2Gleba, 2) + '/m²') + ' de gleba. A parcela em permuta, de ' +
         num(pc(i.permutaPct)) + ' da receita líquida mensal, vale ' + num(R$(i.vpPermuta)) +
         ' trazida pela taxa real do terrenista de ' + num(pc(i.taxaTerrenista) + ' a.a.') + '. ' +
@@ -1181,7 +1185,7 @@
       rec('Investimento × exposição máxima de caixa', i.investimento, -i.exposicao, 1,
         'O capital aportado é exatamente o pior saldo acumulado.');
       rec('Retorno × resultado mais investimento', i.retorno, i.resultado + i.investimento, 1);
-      rec('Valor do terreno × dinheiro mais permuta', i.valorTerreno, i.vpCaixa + i.vpPermuta, 1,
+      rec('Equivalente à vista × dinheiro mais permuta', i.equivalenteVista, i.vpCaixa + i.vpPermuta, 1,
         'Ambas as parcelas trazidas à taxa real do terrenista.');
       rec('Mix dos planos de venda', P.planos.reduce(function (a, b) { return a + (+b.mix || 0); }, 0) * 100, 100, 0.01, 'em %');
       r.fases.forEach(function (fa, k) {
