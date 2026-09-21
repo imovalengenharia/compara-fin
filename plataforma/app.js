@@ -157,6 +157,11 @@
   function ajustarProgramaALV() {
     var disp = alvDisponivelP(), usada = alvUsadaTotal(), nF = nFasesP();
     if (usada <= disp + 0.5 || usada <= 0) return;
+    if (disp <= 0) {
+      avisar('A gleba não comporta nenhum lote', 'Com as perdas atuais a ALV disponível é zero ou negativa. ' +
+        'Reveja o quadro de áreas antes de ajustar o programa — não há o que distribuir.');
+      return;
+    }
     var k = Math.max(0, disp / usada);
     for (var p = 0; p < P.produtos.length; p++) {
       for (var fa = 0; fa < nF; fa++) {
@@ -169,7 +174,8 @@
       'até caberem na área líquida vendável. Redistribua entre as fases como preferir.');
   }
 
-  /* Faixa de alerta que vive no topo das premissas enquanto houver excesso. */
+  /* Faixa no topo das premissas: diz por que os indicadores não fecham.
+     Dois casos — nenhum lote lançado (tudo zero) ou programa maior que a ALV. */
   function faixaALV() {
     var texto = e('span');
     var botao = e('button', { cls: 'acao-clara', type: 'button', txt: 'Ajustar o programa à ALV' });
@@ -177,6 +183,15 @@
     var faixa = e('div', { cls: 'alerta ruim oculto' }, [texto, botao]);
     atualizadores.push(function (r) {
       var falta = -r.ind.alvFolga;
+      if (!r.prog.lotes) {
+        faixa.classList.remove('oculto');
+        botao.style.display = 'none';
+        texto.textContent = 'Nenhum lote lançado no quadro de fases. Sem programa não há receita: ' +
+          'o valor da gleba, a TIR e o resultado ficam em zero. Lance os lotes de cada produto por ' +
+          'fase — ou use "Restaurar padrão" no topo para voltar ao estudo de referência.';
+        return;
+      }
+      botao.style.display = '';
       if (falta <= 0.5) { faixa.classList.add('oculto'); return; }
       faixa.classList.remove('oculto');
       texto.textContent = 'O programa lançado usa ' + n(r.ind.alvUsada, 0) + ' m² e a gleba oferece ' +
@@ -310,10 +325,6 @@
   /* ============================================================ PREMISSAS */
   function folhaPremissas() {
     var f = document.createDocumentFragment();
-    f.appendChild(e('div', { cls: 'folha-topo' }, [
-      e('h1', { txt: 'Premissas' }),
-      e('p', { txt: 'A ordem é a da planilha: primeiro o que a gleba oferece, depois o produto que cabe nela, depois o que ele custa. Cada resultado aparece só depois das premissas que o produzem.' })
-    ]));
     f.appendChild(faixaALV());
 
     /* 1 — quadro de áreas */
@@ -607,14 +618,9 @@
   function folhaVendas(idx) {
     var f = document.createDocumentFragment(), fi = idx;
     var ativa = function () { return fi < Math.round(P.prazos.nFases); };
-    var topo = e('div', { cls: 'folha-topo' }, [
-      e('h1', { txt: 'Vendas — Fase ' + (fi + 1) }),
+    f.appendChild(e('div', { cls: 'folha-topo' }, [
       e('span', { cls: 'selo' + (ativa() ? '' : ' off'), txt: ativa() ? 'fase ativa' : 'fase inativa' })
-    ]);
-    topo.appendChild(e('p', { txt: fi === 0
-      ? 'A 1ª fase lança no mês seguinte ao fim dos pré-operacionais. Todo o resto do cronograma é consequência.'
-      : 'Esta fase não tem mês de lançamento próprio: ela lança quando a fase ' + fi + ' atinge o gatilho de vendas. Início de obra, etapas e fim das vendas são consequência.' }));
-    f.appendChild(topo);
+    ]));
     if (!ativa()) {
       f.appendChild(quadro('Fase inativa', null, [
         e('p', { cls: 'nota-bloco', txt: 'Aumente o número de fases em Premissas › Eventos e faseamento para ativar esta fase. Enquanto inativa, ela não gera obra, vendas nem receita.' })
@@ -721,10 +727,6 @@
   /* ================================================================ FLUXO */
   function folhaFluxo() {
     var f = document.createDocumentFragment();
-    f.appendChild(e('div', { cls: 'folha-topo' }, [
-      e('h1', { txt: 'Fluxo de caixa' }),
-      e('p', { txt: 'Mês a mês, em moeda da data-base: cada conta é reajustada pelo seu indexador e depois deflacionada pelo IPCA acumulado.' })
-    ]));
     var box = e('div');
     atualizadores.push(function (r) {
       box.textContent = '';
@@ -758,10 +760,6 @@
   /* ========================================================= DEMONSTRATIVO */
   function folhaDRF() {
     var f = document.createDocumentFragment();
-    f.appendChild(e('div', { cls: 'folha-topo' }, [
-      e('h1', { txt: 'Demonstrativo e indicadores' }),
-      e('p', { txt: 'Resultado do empreendimento em moeda da data-base e os indicadores da qualidade do investimento.' })
-    ]));
     var box = e('div');
     atualizadores.push(function (r) {
       box.textContent = '';
@@ -870,10 +868,6 @@
   /* ============================================================= MEMORIAL */
   function folhaMemorial() {
     var f = document.createDocumentFragment();
-    f.appendChild(e('div', { cls: 'folha-topo' }, [
-      e('h1', { txt: 'Memorial de premissas' }),
-      e('p', { txt: 'O texto que sustenta os números em due diligence. Tudo aqui é lido do modelo — nada é digitado.' })
-    ]));
     var box = e('div', { cls: 'memo' });
     atualizadores.push(function (r) {
       box.textContent = '';
@@ -941,10 +935,6 @@
   /* ============================================================ AUDITORIA */
   function folhaAuditoria() {
     var f = document.createDocumentFragment();
-    f.appendChild(e('div', { cls: 'folha-topo' }, [
-      e('h1', { txt: 'Auditoria' }),
-      e('p', { txt: 'As reconciliações rodam a cada alteração de premissa. Cada linha compara duas grandezas apuradas por caminhos independentes — se alguma divergir, os números não devem ser apresentados.' })
-    ]));
     var box = e('div');
     atualizadores.push(function (r) {
       box.textContent = '';
@@ -1087,8 +1077,6 @@
      ['Resultado', mi(R.ind.resultado)], ['Investimento', mi(R.ind.investimento)]].forEach(function (d) {
       topo.appendChild(e('div', {}, [e('span', { cls: 'r', txt: d[0] }), e('span', { cls: 'v', txt: d[1] })]));
     });
-    document.getElementById('sub-estudo').textContent =
-      P.identificacao.nome + ' · ' + P.identificacao.municipio + '/' + P.identificacao.uf;
   }
 
   function recalcular() {

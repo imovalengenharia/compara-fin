@@ -51,9 +51,6 @@ button{font:inherit;color:inherit}
 .barra{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:var(--barra-bg);
   color:var(--barra-ink);display:flex;align-items:center;gap:14px;padding:10px 20px;flex-wrap:wrap;
   border-bottom:1px solid var(--rule)}
-.barra .nome{font-family:var(--cond);font-size:19px;letter-spacing:.02em;color:var(--acento)}
-:root[data-tema="claro"] .barra .nome{color:#fff}
-.barra .sub{font-size:var(--t-nota);color:var(--barra-sub)}
 .barra .vazio{flex:1}
 .resumo-topo{display:flex;gap:22px;align-items:baseline}
 .resumo-topo div{display:flex;flex-direction:column}
@@ -70,7 +67,9 @@ button{font:inherit;color:inherit}
 
 /* ---------- abas ---------- */
 .abas{position:sticky;top:calc(env(safe-area-inset-top,0px) + 45px);z-index:29;background:var(--surface);
-  border-bottom:1px solid var(--rule);display:flex;overflow-x:auto;padding:0 12px}
+  border-bottom:1px solid var(--rule);display:flex;overflow-x:auto;overflow-y:hidden;padding:0 12px 1px;
+  scrollbar-width:none;-ms-overflow-style:none}
+.abas::-webkit-scrollbar{display:none}
 .aba{border:none;background:none;padding:10px 15px;font-size:var(--t-rot);color:var(--muted);cursor:pointer;
   white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px}
 .aba:hover{color:var(--ink)}
@@ -79,9 +78,8 @@ button{font:inherit;color:inherit}
 
 /* ---------- folha ---------- */
 .folha{padding:18px 20px 60px;max-width:1520px;margin:0 auto}
-.folha-topo{display:flex;align-items:baseline;gap:12px;margin-bottom:14px;flex-wrap:wrap}
-.folha-topo h1{font-family:var(--cond);font-size:22px}
-.folha-topo p{margin:0;font-size:var(--t-rot);color:var(--muted);max-width:92ch;line-height:var(--lh)}
+.folha-topo{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.folha-topo:empty{display:none}
 .selo{font-size:var(--t-cab);letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;border-radius:3px;
   background:var(--acento-fraco);color:var(--acento)}
 .selo.off{background:var(--rule-soft);color:var(--muted)}
@@ -233,10 +231,8 @@ td.ind{padding-left:24px}
 </style>
 
 <header class="barra">
-  <span class="nome">Involutivo</span>
-  <span class="sub" id="sub-estudo"></span>
-  <span class="vazio"></span>
   <div class="resumo-topo" id="resumo-topo"></div>
+  <span class="vazio"></span>
   <button class="acao" id="btn-tema" type="button" title="Alternar tema">Tema claro</button>
   <button class="acao" id="btn-restaurar" type="button">Restaurar padrão</button>
   <button class="acao" id="btn-json" type="button">Salvar</button>
