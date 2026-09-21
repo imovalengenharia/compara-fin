@@ -54,6 +54,58 @@
   var pc = function (v, d) { return n(v * 100, d === undefined ? 1 : d) + '%'; };
   var mes = function (v) { return v === null || v === undefined ? '—' : 'mês ' + n(v, 0); };
 
+  /* Campos numéricos seguem o padrão brasileiro: ponto separa o milhar,
+     vírgula separa o decimal — igual aos valores calculados ao lado. A tecla
+     "." é convertida em vírgula na digitação, de modo que dentro do campo o
+     ponto é sempre separador de milhar e a vírgula sempre decimal. */
+  function lerNum(txt) {
+    var s = String(txt == null ? '' : txt).trim().replace(/\s/g, '');
+    if (!s) return 0;
+    var neg = /^-/.test(s);
+    s = s.replace(/[+-]/g, '');
+    if (s.indexOf(',') >= 0) {
+      s = s.replace(/\./g, '');
+      s = s.replace(/,/, '\u0001').replace(/,/g, '').replace('\u0001', '.');
+    } else if (s.indexOf('.') >= 0) {
+      /* texto colado: pontos só são milhar se todos separarem grupos de 3 */
+      var g = s.split('.');
+      if (g.slice(1).every(function (x) { return x.length === 3; })) s = g.join('');
+    }
+    var v = parseFloat(s);
+    if (!isFinite(v)) return 0;
+    return neg ? -v : v;
+  }
+  /* Formata o que está sendo digitado sem mexer no que ainda falta digitar:
+     agrupa o milhar da parte inteira e preserva a vírgula e os decimais. */
+  function fmtCampo(txt, inteiro) {
+    var s = String(txt == null ? '' : txt);
+    var neg = /-/.test(s);
+    s = s.replace(/[^\d,]/g, '');
+    var i = inteiro ? -1 : s.indexOf(',');
+    var int = i >= 0 ? s.slice(0, i) : s;
+    var dec = i >= 0 ? s.slice(i + 1).replace(/\D/g, '').slice(0, 6) : null;
+    int = int.replace(/\D/g, '').replace(/^0+(?=\d)/, '');
+    var agrupado = int.replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+    if (!agrupado && dec === null) return neg ? '-' : '';
+    return (neg ? '-' : '') + (agrupado || '0') + (dec === null ? '' : ',' + dec);
+  }
+  function porNum(v, inteiro) {
+    if (v === null || v === undefined || !isFinite(v)) return '';
+    return fmtCampo(String(Math.round(v * 1e6) / 1e6).replace('.', ','), inteiro);
+  }
+  /* Reescreve o campo já formatado mantendo o cursor depois dos mesmos dígitos */
+  function reformatar(el) {
+    var antes = el.value, pos = el.selectionStart;
+    if (pos === null) pos = antes.length;
+    var digitos = antes.slice(0, pos).replace(/[^\d,]/g, '').length;
+    var depois = fmtCampo(antes, el.dataset.inteiro === '1');
+    if (depois === antes) return;
+    el.value = depois;
+    var i = 0, d = 0;
+    while (i < depois.length && d < digitos) { if (/[\d,]/.test(depois[i])) d++; i++; }
+    try { el.setSelectionRange(i, i); } catch (err) {}
+  }
+
   function e(tag, attrs, filhos) {
     var el = document.createElement(tag);
     if (attrs) for (var k in attrs) {
@@ -115,7 +167,7 @@
   }
   function aplicarLimite(el, caminho, valor, msg) {
     guardar(caminho, valor);
-    el.value = valor;
+    el.value = porNum(valor, el.dataset.inteiro === '1');
     el.classList.add('limitado');
     setTimeout(function () { el.classList.remove('limitado'); }, 2200);
     avisar('Limitado pela ALV disponível', msg);
@@ -209,13 +261,13 @@
     var t = el.dataset.tipo, v;
     if (t === 'sel' || t === 'txt') v = el.value;
     else {
-      v = parseFloat(String(el.value).replace(',', '.'));
-      if (!isFinite(v)) v = 0;
+      reformatar(el);
+      v = lerNum(el.value);
       if (t === 'pct') v = v / 100;
-      if (el.dataset.max !== undefined && v > +el.dataset.max) { v = +el.dataset.max; el.value = v; }
-      if (ev.type === 'change' && el.dataset.min !== undefined && v < +el.dataset.min) {
-        v = +el.dataset.min; el.value = v;
-      }
+      var lim = null;
+      if (el.dataset.max !== undefined && v > +el.dataset.max) lim = +el.dataset.max;
+      if (ev.type === 'change' && el.dataset.min !== undefined && v < +el.dataset.min) lim = +el.dataset.min;
+      if (lim !== null) { v = lim; el.value = porNum(t === 'pct' ? v * 100 : v, el.dataset.inteiro === '1'); }
     }
     var excessoAntes = excessoALV();
     guardar(c, v);
@@ -246,11 +298,30 @@
       el = e('input', { id: 'c_' + caminho, type: 'text', value: v == null ? '' : v });
     } else {
       if (tipo === 'pct') v = (v || 0) * 100;
-      el = e('input', { id: 'c_' + caminho, type: 'number', step: opts.step || 'any',
-                        min: opts.min, max: opts.max,
-                        value: v == null ? '' : Math.round(v * 1e6) / 1e6 });
+      var inteiro = opts.step === 1;
+      el = e('input', { id: 'c_' + caminho, type: 'text', cls: 'num',
+                        inputmode: inteiro ? 'numeric' : 'decimal',
+                        autocomplete: 'off', spellcheck: 'false',
+                        value: porNum(v, inteiro) });
+      if (inteiro) el.dataset.inteiro = '1';
       if (opts.min !== undefined) el.dataset.min = opts.min;
       if (opts.max !== undefined) el.dataset.max = opts.max;
+      /* a tecla "." vira vírgula: dentro do campo o ponto é sempre milhar */
+      el.addEventListener('beforeinput', function (ev) {
+        if (ev.inputType !== 'insertText' || (ev.data !== '.' && ev.data !== ',')) return;
+        ev.preventDefault();
+        if (inteiro) return;
+        var a = el.selectionStart, b = el.selectionEnd;
+        if (el.value.slice(0, a).indexOf(',') >= 0) return;   /* já tem decimal */
+        el.value = el.value.slice(0, a) + ',' + el.value.slice(b);
+        try { el.setSelectionRange(a + 1, a + 1); } catch (err) {}
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+      /* ao sair, mostra o valor que ficou guardado, já normalizado */
+      el.addEventListener('blur', function () {
+        var g = pegar(caminho);
+        el.value = porNum(tipo === 'pct' ? (g || 0) * 100 : g, inteiro);
+      });
     }
     el.dataset.caminho = caminho; el.dataset.tipo = tipo;
     if (opts.remonta) el.dataset.remonta = '1';
