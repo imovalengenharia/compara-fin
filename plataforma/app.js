@@ -537,7 +537,7 @@
       P.planos.forEach(function (pl, i) {
         var q = Math.round(+pl.n || 0);
         if (q < 1) return;
-        o.push(['p' + (i + 1), 'Plano ' + (i + 1) + (q > 1 ? ' · ' + q + 'x' : ' · à vista')]);
+        o.push(['p' + (i + 1), 'Plano ' + (i + 1) + ' · ' + q + 'x']);
       });
       return o;
     }
@@ -579,19 +579,7 @@
           return P.produtos[i].tipo === 'comercial'
             ? inp('produtos.' + i + '.momento', 'sel', { opcoes: ['Início', 'Intermediário', 'Fim'] })
             : calc(function () { return 'curva de vendas'; }, 'fraco'); }) },
-      { rot: 'Lotes no programa', cels: idxP.map(function (i) {
-          return calc(function (r) { return n(r.produtos[i].lotes, 0); }); }) },
-      { rot: 'VGV do produto (R$)', cels: idxP.map(function (i) {
-          return calc(function (r) { return r.produtos[i].vgv ? n(r.produtos[i].vgv, 0) : '—'; }); }) },
-      { rot: 'Vendido no mês', cels: idxP.map(function (i) {
-          return calc(function (r) {
-            var p = r.produtos[i];
-            if (p.tipo !== 'comercial') return '—';
-            return p.meses.length
-              ? p.meses.map(function (m) { return 'Fase ' + m.fase + ': mês ' + m.mes; }).join(' · ')
-              : '—';
-          }, 'fraco'); }) }
-    ], 'Residencial vende ao longo das três janelas da fase, rateado entre os planos conforme o quadro acima. Comercial é negociado em um único mês — Início é o lançamento da fase, Intermediário a entrega da obra e Fim o último mês de vendas — pelo plano de venda escolhido, sendo o plano 1 o à vista.')]));
+    ], 'Residencial vende ao longo das três janelas da fase; comercial, em um único mês — Início é o lançamento, Intermediário a entrega da obra e Fim o último mês de vendas.')]));
 
     /* 4 — quadro de fases */
     var fasesAtivas = [];
