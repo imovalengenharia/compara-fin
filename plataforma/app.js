@@ -709,49 +709,6 @@
         'CDI deflacionado pelo IPCA. É a taxa com que o fluxo de permuta é trazido a valor presente.', true)
     ]));
 
-    /* 11 — terreno: o involutivo */
-    var modoResolver = (P.terreno.modo || 'resolver') === 'resolver';
-    var forma = P.terreno.forma || 'permuta';
-    var linhasTerreno = [
-      reg('Modo', [inp('terreno.modo', 'sel', { opcoes: ['resolver', 'informado'], remonta: true })],
-        modoResolver
-          ? 'Resolver: informe o que paga em dinheiro e o modelo acha a permuta que trava a TIR na TMA.'
-          : 'Informado: você trava dinheiro e permuta, e o modelo devolve a TIR que sobra.'),
-      reg('Forma de pagamento', [inp('terreno.forma', 'sel',
-        { opcoes: ['permuta', 'avista', 'misto'], remonta: true })],
-        'Permuta: percentual da receita líquida. À vista: só dinheiro, e o modelo devolve quanto cabe. Misto: você define o dinheiro e a permuta absorve o resto.')
-    ];
-    /* No misto o dinheiro é dado e a permuta absorve o resto; na aquisição à
-       vista o dinheiro é a própria incógnita e o modelo o devolve. */
-    if (forma === 'misto' || (!modoResolver && forma !== 'permuta')) {
-      linhasTerreno.push(reg('Pagamento em dinheiro — total',
-        [inp('terreno.valorDinheiro', 'num', { un: 'R$' })],
-        modoResolver && forma === 'misto'
-          ? 'Quanto da gleba é pago em moeda. O que a TMA ainda permitir vira permuta financeira.'
-          : 'Valor nominal acordado em moeda, distribuído no cronograma abaixo.'));
-    }
-    if (forma !== 'permuta') {
-      linhasTerreno.push(reg('Pagamento em dinheiro — sinal',
-        [inp('terreno.sinal', 'num', { un: 'R$' })],
-        'Parte paga na assinatura, no mês 0. O saldo vai para as parcelas abaixo.'));
-      linhasTerreno.push(reg('Pagamento em dinheiro — início das parcelas',
-        [inp('janelas.terrenoIni', 'num', { step: 1, zero: true }), un('mês')],
-        'Mês em que começa o pagamento do saldo, depois do sinal.'));
-      linhasTerreno.push(reg('Pagamento em dinheiro — nº de parcelas',
-        [inp('janelas.terrenoParc', 'num', { step: 1 }), un('parc.')],
-        'Parcelas iguais e sem reajuste contratual — o custo real cai com o tempo.'));
-    }
-    if (!modoResolver && forma !== 'avista') linhasTerreno.push(reg('Permuta financeira',
-      [inp('terreno.permutaPct', 'pct'), un('%')], 'Percentual da receita líquida mensal.'));
-    /* O terreno é a última premissa: tudo o que vem antes alimenta o que a
-       gleba pode custar. O valor em si é resultado, e sai no Demonstrativo. */
-    var quadroTerreno = quadro('Terreno — como a gleba é paga',
-      modoResolver ? 'TIR travada na TMA' : 'valor informado', linhasTerreno,
-      (modoResolver
-        ? 'O solver busca o que zera o VPL na TMA: com o dinheiro definido, resolve a permuta; na aquisição à vista, resolve o próprio dinheiro. Antecipar o desembolso reduz o teto — pagar tudo à vista vale menos para o empreendedor do que a mesma quantia diluída em permuta. '
-        : 'Dinheiro e permuta estão travados, e o modelo devolve a TIR que sobra. ') +
-      'O quanto a gleba pode custar sai no Demonstrativo, em Pagamento do terreno.');
-
     /* 12 — janelas */
     var j = [];
     function jan(rot, caminho, tipo, nota) {
@@ -774,7 +731,6 @@
       'Fatia gasta na montagem; o restante acompanha o período de vendas.'));
     f.appendChild(quadro('Janelas de desembolso', 'quando cada conta sai do caixa', j,
       'Correspondem às linhas 1 a 7 do cabeçalho da aba FLUXO da planilha.'));
-    f.appendChild(quadroTerreno);
 
     /* identificação, ao final */
     f.appendChild(quadro('Identificação do estudo', null, [
@@ -922,7 +878,49 @@
   /* ========================================================= DEMONSTRATIVO */
   function folhaDRF() {
     var f = document.createDocumentFragment();
-    var box = e('div');
+    /* o quadro do terreno tem campos, e campo que sai do documento perde o
+       foco: ele fica fixo entre dois contêineres que o recálculo redesenha */
+    var boxTopo = e('div'), boxFim = e('div');
+    /* Como a gleba é paga mora junto do que ela custa: é a última conta do
+       estudo, e nenhuma premissa anterior depende dela. Os campos vivem fora
+       do redesenho — se fossem refeitos a cada recálculo, o foco se perderia
+       no meio da digitação. */
+    var modoResolver = (P.terreno.modo || 'resolver') === 'resolver';
+    var forma = P.terreno.forma || 'permuta';
+    var linhasTerreno = [
+      reg('Modo', [inp('terreno.modo', 'sel', { opcoes: ['resolver', 'informado'], remonta: true })],
+        modoResolver
+          ? 'Resolver: informe o que paga em dinheiro e o modelo acha a permuta que trava a TIR na TMA.'
+          : 'Informado: você trava dinheiro e permuta, e o modelo devolve a TIR que sobra.'),
+      reg('Forma de pagamento', [inp('terreno.forma', 'sel',
+        { opcoes: ['permuta', 'avista', 'misto'], remonta: true })],
+        'Permuta: percentual da receita líquida. À vista: só dinheiro, e o modelo devolve quanto cabe. Misto: você define o dinheiro e a permuta absorve o resto.')
+    ];
+    /* No misto o dinheiro é dado e a permuta absorve o resto; na aquisição à
+       vista o dinheiro é a própria incógnita e o modelo o devolve. */
+    if (forma === 'misto' || (!modoResolver && forma !== 'permuta')) {
+      linhasTerreno.push(reg('Pagamento em dinheiro — total',
+        [inp('terreno.valorDinheiro', 'num', { un: 'R$' })],
+        modoResolver && forma === 'misto'
+          ? 'Quanto da gleba é pago em moeda. O que a TMA ainda permitir vira permuta financeira.'
+          : 'Valor nominal acordado em moeda, distribuído no cronograma abaixo.'));
+    }
+    if (forma !== 'permuta') {
+      linhasTerreno.push(reg('Pagamento em dinheiro — sinal',
+        [inp('terreno.sinal', 'num', { un: 'R$' })],
+        'Parte paga na assinatura, no mês 0. O saldo vai para as parcelas abaixo.'));
+      linhasTerreno.push(reg('Pagamento em dinheiro — início das parcelas',
+        [inp('janelas.terrenoIni', 'num', { step: 1, zero: true }), un('mês')],
+        'Mês em que começa o pagamento do saldo, depois do sinal.'));
+      linhasTerreno.push(reg('Pagamento em dinheiro — nº de parcelas',
+        [inp('janelas.terrenoParc', 'num', { step: 1 }), un('parc.')],
+        'Parcelas iguais e sem reajuste contratual — o custo real cai com o tempo.'));
+    }
+    if (!modoResolver && forma !== 'avista') linhasTerreno.push(reg('Permuta financeira',
+      [inp('terreno.permutaPct', 'pct'), un('%')], 'Percentual da receita líquida mensal.'));
+    var entradas = e('div', {}, linhasTerreno);
+    var tabelaTerreno = e('div', { style: 'overflow-x:auto' });
+    var notaTerreno = e('p', { cls: 'nota-bloco' });
     /* a escala é um cálculo sob demanda: os nós vivem fora do redesenho, para
        que a tabela calculada não suma a cada recálculo */
     var escala = e('div');
@@ -964,14 +962,14 @@
       }, 20);
     });
     atualizadores.push(function (r) {
-      box.textContent = '';
+      boxTopo.textContent = ''; boxFim.textContent = ''; tabelaTerreno.textContent = '';
       var i = r.ind, T = r.totais;
       var falhas = r.checks.filter(function (c) { return !c.ok; });
-      if (falhas.length) box.appendChild(e('div', { cls: 'alerta',
+      if (falhas.length) boxTopo.appendChild(e('div', { cls: 'alerta',
         txt: falhas.length + ' controle(s) falharam — não apresente estes números antes de resolver: ' +
              falhas.map(function (c) { return c.txt; }).join('; ') + '.' }));
 
-      box.appendChild(e('div', { cls: 'destaque-gleba' }, [
+      boxTopo.appendChild(e('div', { cls: 'destaque-gleba' }, [
         e('div', {}, [
           e('div', { cls: 'k', txt: i.modoTerreno === 'resolver' ? 'Teto de aquisição da gleba' : 'Valor da gleba informado' }),
           e('div', { cls: 'v', txt: R$(i.valorTerreno) }),
@@ -986,7 +984,7 @@
                       e('div', { cls: 'n', txt: R$(i.valorM2ALV, 2) + ' por m² de ALV' })])
       ]));
 
-      box.appendChild(painel([
+      boxTopo.appendChild(painel([
         ['TIR real', i.tir === null ? '—' : pc(i.tir), i.modoTerreno === 'resolver'
           ? 'travada na TMA de ' + pc(i.tma) : 'a.a. acima do IPCA · TMA ' + pc(i.tma)],
         ['VPL à TMA', R$(i.vpl), ''],
@@ -1069,19 +1067,15 @@
         e('td', { txt: n(i.valorTerreno, 0) }), e('td', { txt: n(i.equivalenteVista, 0) }),
         e('td', { txt: pc(1) })]));
 
-      box.appendChild(e('div', { style: 'margin-top:14px' }, [
-        quadro('Pagamento do terreno', 'como o valor da gleba chega ao terrenista',
-          [e('div', { style: 'overflow-x:auto' },
-             [e('table', { cls: 'dados' }, [e('thead', {}, [thP]), tbP])]),
-           e('div', { style: 'padding:12px 0 2px' }, [btnEscala, escala])],
-          'O nominal é a soma do que o terrenista recebe, em moeda da data-base. O valor presente ' +
-          'desconta cada recebimento pela taxa real do terrenista, ' + pc(i.taxaTerrenista) +
-          ' a.a. — o sinal está no mês 0 e não desconta. Hoje ' + pc(i.pctDinheiroEfetivo) +
-          ' do negócio está em dinheiro. Adiar o pagamento aumenta o nominal que cabe no estudo, ' +
-          'sem mudar o que ele vale hoje.')
-      ]));
+      tabelaTerreno.appendChild(e('table', { cls: 'dados' }, [e('thead', {}, [thP]), tbP]));
+      notaTerreno.textContent =
+        'O nominal é a soma do que o terrenista recebe, em moeda da data-base. O valor presente ' +
+        'desconta cada recebimento pela taxa real do terrenista, ' + pc(i.taxaTerrenista) +
+        ' a.a. — o sinal está no mês 0 e não desconta. Hoje ' + pc(i.pctDinheiroEfetivo) +
+        ' do negócio está em dinheiro. Adiar o pagamento aumenta o nominal que cabe no estudo, ' +
+        'sem mudar o que ele vale hoje.';
 
-      box.appendChild(e('div', { style: 'margin-top:14px' }, [
+      boxFim.appendChild(e('div', {}, [
         quadro('Demonstrativo de resultados', 'valores deflacionados pelo IPCA',
           [e('div', { style: 'overflow-x:auto' }, [e('table', { cls: 'dados' }, [e('thead', {}, [thead]), tb])])])
       ]));
@@ -1097,7 +1091,7 @@
             e('td', { cls: d.resultado < 0 ? 'neg' : '', txt: n(d.resultado, 0) }),
             e('td', { txt: pc(d.receita ? d.resultado / d.receita : 0) })]));
         });
-        box.appendChild(quadro('Resultado por fase', null,
+        boxFim.appendChild(quadro('Resultado por fase', null,
           [e('div', { style: 'overflow-x:auto' }, [e('table', { cls: 'dados' }, [e('thead', {}, [th2]), tb2])])]));
       }
 
@@ -1106,10 +1100,22 @@
         chips.appendChild(e('span', { cls: 'chip' + (c.ok ? '' : ' ruim') },
           [e('span', { cls: 'pt' }), e('span', { txt: c.txt })]));
       });
-      box.appendChild(quadro('Controles de consistência',
+      boxFim.appendChild(quadro('Controles de consistência',
         r.checks.filter(function (c) { return c.ok; }).length + ' de ' + r.checks.length + ' OK', [chips]));
     });
-    f.appendChild(box);
+    f.appendChild(boxTopo);
+    f.appendChild(e('div', { style: 'margin-top:14px' }, [
+      quadro('Pagamento do terreno',
+        modoResolver ? 'como a gleba é paga e quanto ela pode custar'
+                     : 'como a gleba é paga e o que isso vale',
+        [entradas,
+         e('p', { cls: 'nota-bloco', txt: modoResolver
+           ? 'O solver busca o que zera o VPL na TMA: com o dinheiro definido, resolve a permuta; na aquisição à vista, resolve o próprio dinheiro. Antecipar o desembolso reduz o teto — pagar tudo à vista vale menos para o empreendedor do que a mesma quantia diluída em permuta.'
+           : 'Dinheiro e permuta estão travados no que você definiu, e o modelo devolve a TIR que sobra.' }),
+         e('div', { cls: 'divisa' }), tabelaTerreno, notaTerreno,
+         e('div', { style: 'padding:12px 0 2px' }, [btnEscala, escala])])
+    ]));
+    f.appendChild(boxFim);
     return f;
   }
 
