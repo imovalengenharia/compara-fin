@@ -602,8 +602,6 @@
     });
     linhasFase.push({ rot: 'Lotes totais da fase', forte: true, cels: fasesAtivas.map(function (fa) {
       return calc(function (r) { return n(r.prog.fases[fa].totalLotes, 0); }); }) });
-    linhasFase.push({ rot: 'VGV da fase', forte: true, cels: fasesAtivas.map(function (fa) {
-      return calc(function (r) { return R$(r.prog.fases[fa].vgv); }); }) });
     linhasFase.push({ rot: 'ALV da fase', cels: fasesAtivas.map(function (fa) {
       return calc(function (r) { return n(r.prog.fases[fa].alv, 0) + ' m²'; }); }) });
     f.appendChild(quadro('Quadro de fases', 'lotes de cada produto em cada fase',
