@@ -110,14 +110,6 @@
   /* Um campo que ainda mostra o número sugerido pela plataforma é escrito em
      letra mais clara. Assim que o avaliador digita um valor diferente, ele
      passa a ser dado dele e ganha a cor cheia. */
-  /* campo sem valor não exibe unidade: "—" já diz tudo */
-  function marcarVazio(el) {
-    var caixa = el.parentElement;
-    if (caixa && caixa.classList.contains('campo')) {
-      caixa.classList.toggle('sem-afixo', el.value === VAZIO || el.value === '');
-    }
-  }
-
   function semValor(v) { return v === null || v === undefined || v === ''; }
   /* Enquanto a premissa não for informada, o campo mostra o número sugerido
      em letra clara e o modelo calcula com ele. Digitar um valor — ainda que
@@ -129,7 +121,6 @@
     var v = usa ? +sug : g;
     el.value = porNum(tipo === 'pct' ? (v || 0) * 100 : v, inteiro);
     el.classList.toggle('sugerido', usa);
-    marcarVazio(el);
   }
 
   /* Reescreve o campo já formatado mantendo o cursor depois dos mesmos dígitos */
@@ -213,7 +204,6 @@
   function aplicarLimite(el, caminho, valor, msg) {
     guardar(caminho, valor);
     el.value = porNum(valor, el.dataset.inteiro === '1');
-    marcarVazio(el);
     el.classList.add('limitado');
     setTimeout(function () { el.classList.remove('limitado'); }, 2200);
     avisar('Limitado pela ALV disponível', msg);
@@ -324,7 +314,6 @@
     }
     var excessoAntes = excessoALV();
     guardar(c, v);
-    marcarVazio(el);
     travarALV(el, c);
     /* a gleba mudou e o programa não cabe mais: a edição vale, o aviso explica */
     if (excessoALV() > excessoAntes + 0.5) {
@@ -377,8 +366,7 @@
       /* ao entrar, o travessão e o número sugerido saem da frente */
       el.addEventListener('focus', function () {
         if (el.value === VAZIO || el.classList.contains('sugerido')) el.value = '';
-        marcarVazio(el);
-      });
+          });
       /* ao sair, mostra o que ficou guardado — ou a sugestão, se nada ficou */
       el.addEventListener('blur', function () { mostrarSugerido(el, caminho, tipo, inteiro); });
     }
