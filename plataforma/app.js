@@ -611,14 +611,15 @@
       reg('ALV utilizada pelo programa', [calc(function (r) { return n(r.ind.alvUsada, 0) + ' m²'; }),
         calc(function (r) { return pc(r.areas.alvDisponivel ? r.ind.alvUsada / r.areas.alvDisponivel : 0, 1) + ' do disponível'; }, 'fraco')],
         'Soma da área dos lotes lançados nas fases ativas.'),
-      reg('Saldo de ALV', [calc(function (r) { return n(r.ind.alvFolga, 0) + ' m²'; }),
-        calc(function (r) { return r.ind.alvFolga >= -0.5 ? 'ALV suficiente' : 'ALV INSUFICIENTE'; }, 'fraco')],
-        'Disponível menos utilizada.', true),
-      reg('Aproveitamento (ALV / gleba)', [calc(function (r) { return pc(r.ind.aproveitamento, 2); })]),
+      reg('Aproveitamento (ALV / gleba)', [calc(function (r) { return pc(r.ind.aproveitamento, 2); })],
+        'Quanto da gleba bruta virou área de venda. Mede a eficiência do parcelamento.'),
       reg('Lotes no programa', [calc(function (r) { return n(r.prog.lotes, 0); }),
-        calc(function (r) { return n(r.prog.lotesRes, 0) + ' resid. · ' + n(r.prog.lotesCom, 0) + ' com.'; }, 'fraco')]),
-      reg('Preço médio por lote', [calc(function (r) { return R$(r.ind.precoMedioLote); })]),
-      reg('Preço médio por m² de ALV', [calc(function (r) { return R$(r.ind.precoMedioM2, 2); })])
+        calc(function (r) { return n(r.prog.lotesRes, 0) + ' resid. · ' + n(r.prog.lotesCom, 0) + ' com.'; }, 'fraco')],
+        'Unidades lançadas em todas as fases habilitadas, somando os cinco produtos.'),
+      reg('Preço médio por lote', [calc(function (r) { return R$(r.ind.precoMedioLote); })],
+        'VGV de tabela dividido pelo número de lotes. É o tíquete médio do empreendimento.'),
+      reg('Preço médio por m² de ALV', [calc(function (r) { return R$(r.ind.precoMedioM2, 2); })],
+        'VGV de tabela dividido pela ALV utilizada. Compara direto com o mercado da região.')
     ]));
 
     /* 8 — custos */
@@ -632,10 +633,13 @@
       'Incide sobre o pagamento em dinheiro mais o valor presente da permuta.', true));
     custo('(Critério 1) Custo de obra por m² de ALV', 'custos.obraM2', 'num', 'R$ por m² vendável para implantar a infraestrutura.', { un: 'R$' });
     custo('(Critério 2) Custo de obra como % do VGV', 'custos.obraPctVGV', 'pct', 'Alternativa ao critério 1.');
-    c.push(reg('Critério adotado', [inp('custos.criterio', 'sel', { opcoes: ['Critério 1', 'Critério 2'] })]));
-    c.push(reg('Custo de obra adotado', [calc(function (r) { return R$(r.valores.obraTotal); })], null, true));
+    c.push(reg('Critério adotado', [inp('custos.criterio', 'sel', { opcoes: ['Critério 1', 'Critério 2'] })],
+      'Escolhe qual dos dois critérios acima entra na conta; o outro fica só como referência.'));
+    c.push(reg('Custo de obra adotado', [calc(function (r) { return R$(r.valores.obraTotal); })],
+      'Resultado do critério escolhido, apurado sobre a ALV utilizada pelo programa.', true));
     custo('Parcela pré-operacional', 'custos.pctPreOp', 'pct', 'Fatia do custo de implantação destinada a projetos, aprovações e licenciamento.');
-    c.push(reg('Despesas pré-operacionais', [calc(function (r) { return R$(r.valores.preOpV); })], null, true));
+    c.push(reg('Despesas pré-operacionais', [calc(function (r) { return R$(r.valores.preOpV); })],
+      'A parcela acima aplicada ao custo de implantação: o que se gasta antes do lançamento.', true));
     c.push(reg('Despesas de obra', [calc(function (r) { return R$(r.valores.obraExec); })],
       'O que sobra do custo de implantação: a execução da infraestrutura.', true));
     custo('CGA', 'custos.cga', 'pct', 'Rateio da estrutura da incorporadora, sobre o VGV bruto.');
@@ -651,9 +655,12 @@
 
     /* 9 — financiamento */
     f.appendChild(quadro('Financiamento à produção', 'não entra no fluxo nesta versão', [
-      reg('% do custo de obra financiado', [inp('financiamento.pctFinanciado', 'pct', { off: true }), un('%')]),
-      reg('Juros do financiamento', [inp('financiamento.juros', 'pct', { off: true }), un('% a.a.')]),
-      reg('Amortização após a entrega', [inp('financiamento.prazoAmortizacao', 'num', { off: true, step: 1 }), un('meses')])
+      reg('% do custo de obra financiado', [inp('financiamento.pctFinanciado', 'pct', { off: true }), un('%')],
+        'Fatia da obra que seria bancada por financiamento à produção. Inativo nesta versão.'),
+      reg('Juros do financiamento', [inp('financiamento.juros', 'pct', { off: true }), un('% a.a.')],
+        'Custo nominal da linha de crédito. Inativo nesta versão.'),
+      reg('Amortização após a entrega', [inp('financiamento.prazoAmortizacao', 'num', { off: true, step: 1 }), un('meses')],
+        'Prazo para quitar o saldo devedor depois da entrega da obra. Inativo nesta versão.')
     ], 'O estudo é 100% capital próprio, como na planilha de origem: a TIR apresentada é desalavancada.'));
 
     /* 10 — indexadores */
@@ -710,7 +717,8 @@
       'Valor presente do repasse, à taxa real do terrenista.'));
     linhasTerreno.push(reg('Valor por m² de gleba',
       [calc(function (r) { return R$(r.ind.valorM2Gleba, 2); }),
-       calc(function (r) { return R$(r.ind.valorM2ALV, 2) + '/m² ALV'; }, 'fraco')], null, true));
+       calc(function (r) { return R$(r.ind.valorM2ALV, 2) + '/m² ALV'; }, 'fraco')],
+      'Preço unitário da terra: é este número que vai à mesa de negociação.', true));
     var escala = e('div');
     var btnEscala = e('button', { cls: 'acao-clara', type: 'button',
       txt: 'Calcular a escala de formas de pagamento' });
@@ -750,18 +758,21 @@
     /* 12 — janelas */
     var j = [];
     function jan(rot, caminho, tipo, nota) { j.push(reg(rot, [inp(caminho, tipo, { step: 1 }), un(tipo === 'pct' ? '%' : 'mês')], nota)); }
-    jan('Registro e ITBI — mês inicial', 'janelas.itbiIni', 'num');
-    jan('Registro e ITBI — nº de parcelas', 'janelas.itbiParc', 'num');
+    jan('Registro e ITBI — mês inicial', 'janelas.itbiIni', 'num', 'Mês em que começa o desembolso da aquisição.');
+    jan('Registro e ITBI — nº de parcelas', 'janelas.itbiParc', 'num', 'Em quantas parcelas iguais ele é dividido.');
     jan('Contrapartidas — meses antes da obra', 'janelas.contrapAnteObra', 'num', 'Negativo: antecede o início da obra da fase.');
-    jan('Contrapartidas — duração', 'janelas.contrapDur', 'num');
+    jan('Contrapartidas — duração', 'janelas.contrapDur', 'num', 'Por quantos meses as obras de contrapartida consomem caixa.');
     jan('Manutenção — 1ª janela', 'janelas.manutT1', 'num', 'Começa na entrega de cada fase.');
-    j.push(reg('Manutenção — % na 1ª janela', [inp('janelas.manutP1', 'pct'), un('%')]));
-    jan('Manutenção — 2ª janela', 'janelas.manutT2', 'num');
-    jan('Marketing — meses antes do lançamento', 'janelas.mktAntes', 'num');
-    j.push(reg('Marketing — % antes do lançamento', [inp('janelas.mktPctAntes', 'pct'), un('%')]));
-    jan('Marketing — meses após o lançamento', 'janelas.mktDepois', 'num');
-    jan('Stand — meses antes do lançamento', 'janelas.standAntes', 'num');
-    j.push(reg('Stand — % antes do lançamento', [inp('janelas.standPctAntes', 'pct'), un('%')]));
+    j.push(reg('Manutenção — % na 1ª janela', [inp('janelas.manutP1', 'pct'), un('%')],
+      'Fatia gasta na primeira janela; o restante vai para a segunda.'));
+    jan('Manutenção — 2ª janela', 'janelas.manutT2', 'num', 'Duração da segunda janela, que começa quando a primeira termina.');
+    jan('Marketing — meses antes do lançamento', 'janelas.mktAntes', 'num', 'Negativo: antecede o lançamento da fase.');
+    j.push(reg('Marketing — % antes do lançamento', [inp('janelas.mktPctAntes', 'pct'), un('%')],
+      'Fatia gasta na pré-abertura; o restante se dilui ao longo das vendas.'));
+    jan('Marketing — meses após o lançamento', 'janelas.mktDepois', 'num', 'Por quantos meses o marketing segue depois do lançamento.');
+    jan('Stand — meses antes do lançamento', 'janelas.standAntes', 'num', 'Negativo: o stand é montado antes do lançamento.');
+    j.push(reg('Stand — % antes do lançamento', [inp('janelas.standPctAntes', 'pct'), un('%')],
+      'Fatia gasta na montagem; o restante acompanha o período de vendas.'));
     f.appendChild(quadro('Janelas de desembolso', 'quando cada conta sai do caixa', j,
       'Correspondem às linhas 1 a 7 do cabeçalho da aba FLUXO da planilha.'));
 
@@ -791,7 +802,8 @@
         'A obra começa no mês seguinte ao fim da janela de lançamento.'),
       reg('Entrega da obra', [calc(function (r) { return mes(F(r).obraFim); })],
         'Marco de referência para a manutenção pós-obra e para os lotes comerciais vendidos no "Intermediário".', true),
-      reg('Fim das vendas da fase', [calc(function (r) { return mes(F(r).fimVendas); })], null, true)
+      reg('Fim das vendas da fase', [calc(function (r) { return mes(F(r).fimVendas); })],
+        'Último mês em que a fase vende. Os recebimentos das parcelas seguem depois dele.', true)
     ]));
 
     var linhasEtapa = [
