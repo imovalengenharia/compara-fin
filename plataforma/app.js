@@ -743,85 +743,14 @@
     }
     if (!modoResolver && forma !== 'avista') linhasTerreno.push(reg('Permuta financeira',
       [inp('terreno.permutaPct', 'pct'), un('%')], 'Percentual da receita líquida mensal.'));
-    linhasTerreno.push(reg('Valor da gleba',
-      [calc(function (r) { return R$(r.ind.valorTerreno); })],
-      modoResolver ? 'Dinheiro mais permuta, pelo nominal. É o teto: acima disso o empreendimento deixa de remunerar a TMA.'
-                   : 'Dinheiro mais permuta, pelo nominal: o total que o terrenista recebe ao longo do negócio.', true));
-    linhasTerreno.push(reg('   parte em permuta',
-      [calc(function (r) { return R$(r.ind.permutaNominal); }),
-       calc(function (r) { return pc(r.ind.permutaPct) + ' da receita'; }, 'fraco')],
-      'Soma dos repasses em moeda da data-base, sem desconto no tempo.'));
-    linhasTerreno.push(reg('Equivalente à vista',
-      [calc(function (r) { return R$(r.ind.equivalenteVista); })],
-      'O mesmo negócio trazido a valor presente pela taxa real do terrenista. É a base do ITBI.'));
-    /* No pagamento misto o equivalente à vista é uma soma de três peças, e
-       ela fica escrita: a permuta descontada, o sinal — que já está no mês 0
-       e não desconta — e as parcelas descontadas. Cada peça só aparece
-       quando existe, e nenhuma aparece sozinha: aí a linha acima já diz tudo. */
-    function pecaVista(rot, campo, nota) {
-      var linha = reg(rot, [calc(function (r) { return R$(r.ind[campo]); })], nota);
-      atualizadores.push(function (r) {
-        var pecas = ['vpPermuta', 'vpSinal', 'vpParcelas'].filter(function (k) {
-          return r.ind[k] > 0.5;
-        }).length;
-        linha.style.display = (pecas > 1 && r.ind[campo] > 0.5) ? '' : 'none';
-      });
-      linhasTerreno.push(linha);
-    }
-    pecaVista('   permuta, a valor presente', 'vpPermuta',
-      'Repasses futuros da permuta, descontados à taxa real do terrenista.');
-    pecaVista('   sinal, na assinatura', 'vpSinal',
-      'Pago no mês 0: já está a valor presente, sem desconto.');
-    pecaVista('   parcelas, a valor presente', 'vpParcelas',
-      'Saldo em dinheiro, parcela a parcela, descontado à mesma taxa.');
-    linhasTerreno.push(reg('Valor por m² de gleba',
-      [calc(function (r) { return R$(r.ind.valorM2Gleba, 2); }),
-       calc(function (r) { return R$(r.ind.valorM2ALV, 2) + '/m² ALV'; }, 'fraco')],
-      'Valor da gleba dividido pela área: é este número que vai à mesa de negociação.', true));
-    var escala = e('div');
-    var btnEscala = e('button', { cls: 'acao-clara', type: 'button',
-      txt: 'Calcular a escala de formas de pagamento' });
-    btnEscala.addEventListener('click', function () {
-      btnEscala.disabled = true; btnEscala.textContent = 'calculando…';
-      setTimeout(function () {
-        /* o teto à vista é o maior dinheiro que o estudo suporta: a escala
-           varre desse limite até a permuta pura */
-        var soPerm = JSON.parse(JSON.stringify(P));
-        soPerm.terreno = { modo: 'resolver', forma: 'avista', valorDinheiro: 0,
-                           sinal: P.terreno.sinal, permutaPct: 0 };
-        var teto = Motor.calcular(soPerm).ind.caixaTerreno;
-        var pontos = [0, 0.25, 0.5, 0.75, 1].map(function (a) {
-          var copia = JSON.parse(JSON.stringify(P));
-          copia.terreno = { modo: 'resolver', valorDinheiro: a * teto, sinal: P.terreno.sinal,
-            permutaPct: 0, forma: a === 0 ? 'permuta' : a === 1 ? 'avista' : 'misto' };
-          var x = Motor.calcular(copia).ind;
-          /* a fração se mede em valor presente: o dinheiro parcelado vale
-             menos que o seu nominal */
-          return { a: x.pctDinheiroEfetivo,
-                   valor: x.valorTerreno, caixa: x.caixaTerreno, perm: x.permutaPct,
-                   inv: x.investimento, pb: x.payback };
-        });
-        var th = e('tr', {}, ['Pago em dinheiro', 'Valor da gleba', 'Em dinheiro (R$)',
-          'Permuta (% da receita líq.)', 'Investimento requerido', 'Payback'].map(function (t) { return e('th', { txt: t }); }));
-        var tb = e('tbody');
-        pontos.forEach(function (x) {
-          tb.appendChild(e('tr', {}, [e('td', { txt: pc(x.a) }), e('td', { txt: R$(x.valor) }),
-            e('td', { txt: R$(x.caixa) }), e('td', { txt: pc(x.perm) }),
-            e('td', { txt: R$(x.inv) }), e('td', { txt: n(x.pb, 0) + ' meses' })]));
-        });
-        escala.textContent = '';
-        escala.appendChild(e('div', { style: 'overflow-x:auto;margin-top:8px' },
-          [e('table', { cls: 'dados' }, [e('thead', {}, [th]), tb])]));
-        escala.appendChild(e('p', { cls: 'nota-bloco', txt: 'Mesma TIR em todas as linhas — o que muda é quanto a terra pode custar conforme o desembolso é antecipado. É a régua da negociação: quanto o terrenista precisa aceitar em permuta para que o preço pedido caiba no estudo.' }));
-        btnEscala.disabled = false; btnEscala.textContent = 'Recalcular a escala';
-      }, 20);
-    });
-    linhasTerreno.push(e('div', { style: 'padding:10px 0 2px' }, [btnEscala, escala]));
-    f.appendChild(quadro('Terreno — quanto a gleba pode custar',
+    /* O terreno é a última premissa: tudo o que vem antes alimenta o que a
+       gleba pode custar. O valor em si é resultado, e sai no Demonstrativo. */
+    var quadroTerreno = quadro('Terreno — como a gleba é paga',
       modoResolver ? 'TIR travada na TMA' : 'valor informado', linhasTerreno,
-      modoResolver
-        ? 'O solver busca o que zera o VPL na TMA: com o dinheiro definido, resolve a permuta; na aquisição à vista, resolve o próprio dinheiro. Antecipar o desembolso reduz o teto — pagar tudo à vista vale menos para o empreendedor do que a mesma quantia diluída em permuta.'
-        : null));
+      (modoResolver
+        ? 'O solver busca o que zera o VPL na TMA: com o dinheiro definido, resolve a permuta; na aquisição à vista, resolve o próprio dinheiro. Antecipar o desembolso reduz o teto — pagar tudo à vista vale menos para o empreendedor do que a mesma quantia diluída em permuta. '
+        : 'Dinheiro e permuta estão travados, e o modelo devolve a TIR que sobra. ') +
+      'O quanto a gleba pode custar sai no Demonstrativo, em Pagamento do terreno.');
 
     /* 12 — janelas */
     var j = [];
@@ -845,6 +774,7 @@
       'Fatia gasta na montagem; o restante acompanha o período de vendas.'));
     f.appendChild(quadro('Janelas de desembolso', 'quando cada conta sai do caixa', j,
       'Correspondem às linhas 1 a 7 do cabeçalho da aba FLUXO da planilha.'));
+    f.appendChild(quadroTerreno);
 
     /* identificação, ao final */
     f.appendChild(quadro('Identificação do estudo', null, [
@@ -993,6 +923,46 @@
   function folhaDRF() {
     var f = document.createDocumentFragment();
     var box = e('div');
+    /* a escala é um cálculo sob demanda: os nós vivem fora do redesenho, para
+       que a tabela calculada não suma a cada recálculo */
+    var escala = e('div');
+    var btnEscala = e('button', { cls: 'acao-clara', type: 'button',
+      txt: 'Calcular a escala de formas de pagamento' });
+    btnEscala.addEventListener('click', function () {
+      btnEscala.disabled = true; btnEscala.textContent = 'calculando…';
+      setTimeout(function () {
+        /* o teto à vista é o maior dinheiro que o estudo suporta: a escala
+           varre desse limite até a permuta pura */
+        var soPerm = JSON.parse(JSON.stringify(P));
+        soPerm.terreno = { modo: 'resolver', forma: 'avista', valorDinheiro: 0,
+                           sinal: P.terreno.sinal, permutaPct: 0 };
+        var teto = Motor.calcular(soPerm).ind.caixaTerreno;
+        var pontos = [0, 0.25, 0.5, 0.75, 1].map(function (a) {
+          var copia = JSON.parse(JSON.stringify(P));
+          copia.terreno = { modo: 'resolver', valorDinheiro: a * teto, sinal: P.terreno.sinal,
+            permutaPct: 0, forma: a === 0 ? 'permuta' : a === 1 ? 'avista' : 'misto' };
+          var x = Motor.calcular(copia).ind;
+          /* a fração se mede em valor presente: o dinheiro parcelado vale
+             menos que o seu nominal */
+          return { a: x.pctDinheiroEfetivo, valor: x.valorTerreno, vista: x.equivalenteVista,
+                   caixa: x.caixaTerreno, perm: x.permutaPct, inv: x.investimento, pb: x.payback };
+        });
+        var th = e('tr', {}, ['Pago em dinheiro', 'Valor da gleba', 'Equivalente à vista',
+          'Em dinheiro (R$)', 'Permuta (% da receita líq.)', 'Investimento requerido', 'Payback']
+          .map(function (t) { return e('th', { txt: t }); }));
+        var tb = e('tbody');
+        pontos.forEach(function (x) {
+          tb.appendChild(e('tr', {}, [e('td', { txt: pc(x.a) }), e('td', { txt: R$(x.valor) }),
+            e('td', { txt: R$(x.vista) }), e('td', { txt: R$(x.caixa) }), e('td', { txt: pc(x.perm) }),
+            e('td', { txt: R$(x.inv) }), e('td', { txt: n(x.pb, 0) + ' meses' })]));
+        });
+        escala.textContent = '';
+        escala.appendChild(e('div', { style: 'overflow-x:auto;margin-top:10px' },
+          [e('table', { cls: 'dados' }, [e('thead', {}, [th]), tb])]));
+        escala.appendChild(e('p', { cls: 'nota-bloco', txt: 'Mesma TIR em todas as linhas — o que muda é quanto a terra pode custar conforme o desembolso é antecipado. É a régua da negociação: quanto o terrenista precisa aceitar em permuta para que o preço pedido caiba no estudo.' }));
+        btnEscala.disabled = false; btnEscala.textContent = 'Recalcular a escala';
+      }, 20);
+    });
     atualizadores.push(function (r) {
       box.textContent = '';
       var i = r.ind, T = r.totais;
@@ -1005,14 +975,15 @@
         e('div', {}, [
           e('div', { cls: 'k', txt: i.modoTerreno === 'resolver' ? 'Teto de aquisição da gleba' : 'Valor da gleba informado' }),
           e('div', { cls: 'v', txt: R$(i.valorTerreno) }),
-          e('div', { cls: 'n', txt: (i.formaTerreno === 'avista' ? 'integralmente à vista, em ' + i.parcelasTerreno +
-              (i.parcelasTerreno > 1 ? ' parcelas' : ' parcela') + ' a partir do mês ' + i.mesTerreno
-            : i.formaTerreno === 'permuta' ? 'integralmente em permuta: ' + pc(i.permutaPct) + ' da receita líquida mensal'
-            : R$(i.caixaTerreno) + ' em dinheiro mais permuta de ' + pc(i.permutaPct) + ' da receita líquida') +
-            (i.modoTerreno === 'resolver' ? ' · TIR travada na TMA de ' + pc(i.tma) : '') })
+          e('div', { cls: 'n', txt: 'nominal, somando dinheiro e permuta' +
+            (i.modoTerreno === 'resolver' ? ' · TIR travada na TMA de ' + pc(i.tma) : ' · valor informado') })
         ]),
+        e('div', {}, [e('div', { cls: 'k', txt: 'Equivalente à vista' }),
+                      e('div', { cls: 'v', style: 'font-size:26px', txt: R$(i.equivalenteVista) }),
+                      e('div', { cls: 'n', txt: 'a ' + pc(i.taxaTerrenista) + ' a.a. · base do ITBI' })]),
         e('div', {}, [e('div', { cls: 'k', txt: 'Por m² de gleba' }),
-                      e('div', { cls: 'v', style: 'font-size:26px', txt: R$(i.valorM2Gleba, 2) })])
+                      e('div', { cls: 'v', style: 'font-size:26px', txt: R$(i.valorM2Gleba, 2) }),
+                      e('div', { cls: 'n', txt: R$(i.valorM2ALV, 2) + ' por m² de ALV' })])
       ]));
 
       box.appendChild(painel([
@@ -1065,6 +1036,51 @@
           e('td', { txt: pc(l[1] / T.receita) }), e('td', { txt: pc(l[1] / i.vgv) })
         ]));
       });
+      /* Pagamento do terreno: uma linha por meio de pagamento, o nominal ao
+         lado do valor presente. O nominal é o que o terrenista recebe; o
+         valor presente é o que esse recebimento vale hoje, à taxa dele. */
+      var meios = [];
+      var emParcelas = Math.max(0, i.caixaTerreno - i.sinalTerreno);
+      if (i.sinalTerreno > 0.5) meios.push(['Sinal, em dinheiro', 'na assinatura, no mês 0',
+        i.sinalTerreno, i.vpSinal]);
+      if (emParcelas > 0.5) meios.push(['Parcelas em dinheiro',
+        i.parcelasTerreno + (i.parcelasTerreno > 1 ? ' parcelas iguais' : ' parcela') +
+        ' a partir do mês ' + i.mesTerreno, emParcelas, i.vpParcelas]);
+      if (i.permutaNominal > 0.5) meios.push(['Permuta financeira',
+        pc(i.permutaPct) + ' da receita líquida mensal', i.permutaNominal, i.vpPermuta]);
+
+      /* a condição anda colada ao meio de pagamento: é o mesmo assunto */
+      function meio(rot, cond) {
+        return e('td', {}, [e('span', { txt: rot }),
+          cond ? e('span', { cls: 'cond', txt: ' · ' + cond }) : null]);
+      }
+      var thP = e('tr', {}, ['Meio de pagamento', 'Nominal (R$)', 'Valor presente (R$)', '% do negócio']
+        .map(function (t) { return e('th', { txt: t }); }));
+      var tbP = e('tbody');
+      meios.forEach(function (m) {
+        tbP.appendChild(e('tr', {}, [meio(m[0], m[1]),
+          e('td', { txt: n(m[2], 0) }), e('td', { txt: n(m[3], 0) }),
+          e('td', { txt: pc(i.equivalenteVista > 0 ? m[3] / i.equivalenteVista : 0) })]));
+      });
+      /* com um único meio de pagamento a soma repetiria a linha acima */
+      if (meios.length > 1) tbP.appendChild(e('tr', { cls: 'soma' }, [
+        meio(i.modoTerreno === 'resolver' ? '= Teto da gleba' : '= Valor da gleba',
+             i.modoTerreno === 'resolver' ? 'o que zera o VPL na TMA' : 'valor informado'),
+        e('td', { txt: n(i.valorTerreno, 0) }), e('td', { txt: n(i.equivalenteVista, 0) }),
+        e('td', { txt: pc(1) })]));
+
+      box.appendChild(e('div', { style: 'margin-top:14px' }, [
+        quadro('Pagamento do terreno', 'como o valor da gleba chega ao terrenista',
+          [e('div', { style: 'overflow-x:auto' },
+             [e('table', { cls: 'dados' }, [e('thead', {}, [thP]), tbP])]),
+           e('div', { style: 'padding:12px 0 2px' }, [btnEscala, escala])],
+          'O nominal é a soma do que o terrenista recebe, em moeda da data-base. O valor presente ' +
+          'desconta cada recebimento pela taxa real do terrenista, ' + pc(i.taxaTerrenista) +
+          ' a.a. — o sinal está no mês 0 e não desconta. Hoje ' + pc(i.pctDinheiroEfetivo) +
+          ' do negócio está em dinheiro. Adiar o pagamento aumenta o nominal que cabe no estudo, ' +
+          'sem mudar o que ele vale hoje.')
+      ]));
+
       box.appendChild(e('div', { style: 'margin-top:14px' }, [
         quadro('Demonstrativo de resultados', 'valores deflacionados pelo IPCA',
           [e('div', { style: 'overflow-x:auto' }, [e('table', { cls: 'dados' }, [e('thead', {}, [thead]), tb])])])
