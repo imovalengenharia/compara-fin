@@ -957,6 +957,104 @@
     return f;
   }
 
+
+  /* ======================================================= CURVA DO CAIXA */
+  /* O estudo inteiro é tabela; esta é a única imagem. Uma série só — o caixa
+     acumulado —, uma cor só, e a posição em relação ao zero carregando a
+     polaridade: abaixo da linha é capital exposto, acima é capital devolvido.
+     Os dois pontos que o painel de indicadores nomeia ganham marca e rótulo;
+     o resto fica no eixo e no tooltip. A tabela equivalente é a aba do fluxo. */
+  function curvaDoCaixa(r) {
+    var meses = r.meses, L = 48, T = 16, Rr = 18, B = 34, W = 1000, H = 300;
+    var ini = 0, fim = Math.max(1, r.ind.ciclo);
+    var lo = 0, hi = 0;
+    for (var k = ini; k <= fim && k < meses.length; k++) {
+      lo = Math.min(lo, meses[k].acum); hi = Math.max(hi, meses[k].acum);
+    }
+    var folga = (hi - lo) * 0.08 || 1;
+    lo -= folga; hi += folga;
+    function x(m) { return L + (m - ini) / (fim - ini) * (W - L - Rr); }
+    function y(v) { return T + (hi - v) / (hi - lo) * (H - T - B); }
+
+    /* SVG vive em outro namespace: criado como HTML, o elemento existe mas não
+       tem layout nenhum — desenha 25 filhos numa caixa de altura zero */
+    function el(tag, at) { var n2 = document.createElementNS('http://www.w3.org/2000/svg', tag);
+      for (var a in at) if (at[a] !== null) n2.setAttribute(a, at[a]); return n2; }
+    var svg = el('svg', { viewBox: '0 0 ' + W + ' ' + H, 'class': 'curva',
+                          role: 'img', 'aria-label': 'Caixa acumulado mês a mês' });
+
+    /* eixo vertical: quatro marcas redondas em milhões */
+    var passo = Math.pow(10, Math.floor(Math.log(Math.max(1, hi - lo)) / Math.LN10)) / 2;
+    while ((hi - lo) / passo > 6) passo *= 2;
+    for (var v = Math.ceil(lo / passo) * passo; v <= hi; v += passo) {
+      svg.appendChild(el('line', { x1: L, x2: W - Rr, y1: y(v), y2: y(v),
+        class: Math.abs(v) < passo / 2 ? 'zero' : 'grade' }));
+      var t = el('text', { x: L - 8, y: y(v) + 3.5, class: 'marca fim' });
+      /* no eixo, zero é zero: o traço da plataforma vale para valor ausente,
+         não para a linha que separa exposição de retorno */
+      t.textContent = Math.abs(v) < passo / 2 ? '0' : (v < 0 ? '\u2212' : '') + n(Math.abs(v) / 1e6, 1) + ' M';
+      svg.appendChild(t);
+    }
+    /* eixo do tempo: de dois em dois anos, sempre em ano fechado */
+    var passoM = fim > 180 ? 36 : fim > 90 ? 24 : 12;
+    for (var m2 = 0; m2 <= fim; m2 += passoM) {
+      var tx = el('text', { x: x(m2), y: H - 8, class: 'marca meio' });
+      tx.textContent = m2; svg.appendChild(tx);
+    }
+
+    /* a curva e a lâmina sob ela, na mesma cor, a 10% */
+    var d = '', dA = 'M ' + x(ini) + ' ' + y(0);
+    for (var q = ini; q <= fim && q < meses.length; q++) {
+      d += (q === ini ? 'M ' : ' L ') + x(q).toFixed(1) + ' ' + y(meses[q].acum).toFixed(1);
+      dA += ' L ' + x(q).toFixed(1) + ' ' + y(meses[q].acum).toFixed(1);
+    }
+    dA += ' L ' + x(Math.min(fim, meses.length - 1)) + ' ' + y(0) + ' Z';
+    svg.appendChild(el('path', { d: dA, class: 'lamina' }));
+    svg.appendChild(el('path', { d: d, class: 'linha' }));
+
+    /* os dois pontos que o painel nomeia */
+    function marca(m3, rot, acima) {
+      if (m3 == null || m3 < ini || m3 > fim || m3 >= meses.length) return;
+      var px = x(m3), py = y(meses[m3].acum);
+      svg.appendChild(el('circle', { cx: px, cy: py, r: 5, class: 'ponto' }));
+      var lado = px > W * 0.72 ? 'fim' : 'ini', dx = lado === 'fim' ? -10 : 10;
+      /* o rótulo nunca encosta no eixo dos meses nem no topo da moldura */
+      var ty = Math.max(T + 12, Math.min(H - B - 6, py + (acima ? -12 : 20)));
+      var t2 = el('text', { x: px + dx, y: ty, class: 'rotulo ' + lado });
+      t2.textContent = rot; svg.appendChild(t2);
+    }
+    marca(r.ind.mesExposicao, 'exposição máxima · ' + mi(-r.ind.exposicao) + ' no mês ' + r.ind.mesExposicao, false);
+    marca(r.ind.payback, 'payback · mês ' + r.ind.payback, true);
+
+    /* leitura sob o cursor: fio vertical e um cartão com o mês inteiro */
+    var fio = el('line', { x1: 0, x2: 0, y1: T, y2: H - B, class: 'fio', opacity: 0 });
+    var bola = el('circle', { cx: 0, cy: 0, r: 4, class: 'bola', opacity: 0 });
+    svg.appendChild(fio); svg.appendChild(bola);
+    var cartao = e('div', { cls: 'cartao', hidden: 'hidden' });
+    var caixa = e('div', { cls: 'curva-caixa' }, [svg, cartao]);
+    function mover(ev) {
+      var cx = caixa.getBoundingClientRect(), px = (ev.clientX - cx.left) / cx.width * W;
+      var m4 = Math.round(ini + (px - L) / (W - L - Rr) * (fim - ini));
+      m4 = Math.max(ini, Math.min(fim, m4));
+      var p = meses[m4]; if (!p) return;
+      fio.setAttribute('x1', x(m4)); fio.setAttribute('x2', x(m4)); fio.setAttribute('opacity', 1);
+      bola.setAttribute('cx', x(m4)); bola.setAttribute('cy', y(p.acum)); bola.setAttribute('opacity', 1);
+      cartao.textContent = '';
+      cartao.appendChild(e('div', { cls: 'k', txt: 'mês ' + m4 }));
+      [['Caixa acumulado', R$(p.acum)], ['Fluxo do mês', R$(p.fluxo)],
+       ['Receita do mês', R$(p.receitaRes + p.receitaCom)]].forEach(function (par) {
+        cartao.appendChild(e('div', {}, [e('span', { txt: par[0] }), e('b', { txt: par[1] })]));
+      });
+      cartao.hidden = false;
+      cartao.style.left = Math.min(Math.max(0, (x(m4) / W) * cx.width - 90), cx.width - 190) + 'px';
+    }
+    caixa.addEventListener('mousemove', mover);
+    caixa.addEventListener('mouseleave', function () {
+      cartao.hidden = true; fio.setAttribute('opacity', 0); bola.setAttribute('opacity', 0);
+    });
+    return caixa;
+  }
+
   function folhaDRF() {
     var f = document.createDocumentFragment();
     /* o quadro do terreno tem campos, e campo que sai do documento perde o
@@ -1038,6 +1136,16 @@
         ['Resultado por lote', R$(i.resultadoPorLote), ''],
         ['Resultado por m² de ALV', R$(i.resultadoPorM2, 2), ''],
         ['Registro e ITBI', R$(-r.totais.itbi), pc(usual('custos.outrosTerreno')) + ' do equivalente à vista']
+      ]));
+
+      boxTopo.appendChild(e('div', { style: 'margin-top:14px' }, [
+        quadro('Curva do caixa', 'o capital exposto e devolvido, mês a mês',
+          [curvaDoCaixa(r),
+           e('p', { cls: 'nota-bloco', txt:
+             'Abaixo da linha do zero é capital exposto; acima, capital já devolvido. O fundo do vale ' +
+             'é o investimento que o empreendimento exige — ' + mi(-i.exposicao) + ' no mês ' +
+             i.mesExposicao + ' — e o cruzamento do zero é o payback, no mês ' + i.payback + '. ' +
+             'Passe o cursor para ler qualquer mês; a tabela inteira está na aba Fluxo de caixa.' })])
       ]));
 
       var linhas = [
