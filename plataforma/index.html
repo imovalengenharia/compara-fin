@@ -261,6 +261,16 @@ table.dados.compacto thead tr.rotulos th{top:64px}
 .chave input.num.com-sufixo{padding-right:13px}
 .chave .campo>.sufixo{height:17px;right:3px;font-size:9px}
 table.dados.compacto td:first-child{padding-left:12px}
+/* a matriz de safras: o grupo da janela abre o cabeçalho, e a coluna do mês
+   e a do recebido ficam presas à esquerda enquanto as safras rolam */
+table.dados.safras thead tr.grupos th{top:0;text-align:center;letter-spacing:.06em;
+  background:var(--rule-soft);color:var(--acento);border-bottom:1px solid var(--rule)}
+table.dados.safras thead tr.grupos th:first-child{background:var(--rule-soft)}
+table.dados.safras thead tr:last-child th{top:27px}
+table.dados.safras th:nth-child(2),table.dados.safras td:nth-child(2){position:sticky;left:48px;
+  background:var(--surface);z-index:1;border-right:1px solid var(--rule)}
+table.dados.safras thead tr:last-child th:nth-child(2){z-index:3}
+table.dados.safras tbody tr.soma td{border-bottom:1px solid var(--rule)}
 table.dados tr:hover td{background:var(--rule-soft)}
 .neg{color:var(--neg)}
 tr.soma td{border-top:1px solid var(--rule)}

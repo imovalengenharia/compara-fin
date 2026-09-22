@@ -249,6 +249,15 @@
        mês, o que entra de sinal e o que chega das parcelas de meses anteriores */
     var entFase = [z(), z(), z(), z()], parcFase = [z(), z(), z(), z()],
         vgvFase = [z(), z(), z(), z()], lotesFase = [z(), z(), z(), z()];
+    /* a safra é o mês da venda: o que se vendeu ali recebe ao longo do tempo,
+       e é assim que a aba de vendas da planilha enxerga a receita */
+    var safras = [{}, {}, {}, {}];
+    function safra(fase, mv) {
+      var mapa = safras[fase];
+      if (!mapa[mv]) mapa[mv] = { mes: mv, lotes: 0, vgv: 0, entrada: 0, parcela: 0,
+                                  parcelas: 0, serie: z() };
+      return mapa[mv];
+    }
     var planos = P.planos.map(function (pl) {
       var n = Math.max(0, Math.round(num(pl.n)));
       var jrReal = num(pl.jurosReal);
@@ -279,6 +288,9 @@
           recFase[fase][m] += ent * def(m);
           entFase[fase][m] += ent * def(m);
           vgvFase[fase][m] += valor * def(m);
+          var sf = safra(fase, m);
+          sf.vgv += valor * def(m); sf.entrada += ent * def(m);
+          sf.serie[m] += ent * def(m);
         }
         var fin = valor * (1 - pl.entrada);
         if (fin <= 0 || pl.n <= 1) continue;
@@ -286,7 +298,12 @@
         for (var t = 1; t <= pl.n && m + t < N; t++) {
           var v = pmt * def(m + t);
           rec[m + t] += v; porTipo[m + t] += v; parcelas[m + t] += v;
-          if (fase >= 0) { recFase[fase][m + t] += v; parcFase[fase][m + t] += v; }
+          if (fase >= 0) {
+            recFase[fase][m + t] += v; parcFase[fase][m + t] += v;
+            var sp = safra(fase, m);
+            sp.serie[m + t] += v;
+            if (t === 1) { sp.parcela += pmt * def(m + 1); sp.parcelas = Math.max(sp.parcelas, pl.n); }
+          }
         }
       }
     }
@@ -295,6 +312,7 @@
         var pr = prog.prods[p], serie = cron.vendas[f][p];
         for (var m = 0; m < N; m++) if (serie[m] > 0) {
           lotesFase[f][m] += serie[m];
+          safra(f, m).lotes += serie[m];
           vender(serie[m], pr.precoLote, m, f, pr.pagamento, pr.tipo === 'comercial');
         }
       }
@@ -304,7 +322,7 @@
     return { rec: rec, recRes: recRes, recCom: recCom, vgvVendido: vgvVendido,
              entradas: entradas, parcelas: parcelas,
              recFase: recFase, entFase: entFase, parcFase: parcFase,
-             vgvFase: vgvFase, lotesFase: lotesFase,
+             vgvFase: vgvFase, lotesFase: lotesFase, safras: safras,
              ultimoRecebimento: ultimo, planos: planos };
   }
 
@@ -701,7 +719,17 @@
                       receita: R.recFase[i][k], acumulada: accRec,
                       aReceber: Math.max(0, total - accRec) });
       }
-      return { fase: f.i, meses: linhas,
+      /* as safras, em ordem, com a janela de venda a que cada uma pertence —
+         é o agrupamento que a planilha faz em blocos de colunas */
+      var lista = Object.keys(R.safras[i]).map(Number).sort(function (a, b) { return a - b; });
+      var colunas = lista.map(function (mv) {
+        var sf = R.safras[i][mv];
+        return { mes: mv, lotes: sf.lotes, vgv: sf.vgv, entrada: sf.entrada,
+                 parcela: sf.parcela, parcelas: sf.parcelas, serie: sf.serie,
+                 janela: mv <= f.lancFim ? 0 : mv < f.obraIni + f.prazoObra ? 1 : 2 };
+      });
+      return { fase: f.i, meses: linhas, safras: colunas,
+               janelas: ['Vendas no lan\u00e7amento', 'Vendas durante a obra', 'Vendas do estoque'],
                totais: { lotes: soma(R.lotesFase[i]), vgv: soma(R.vgvFase[i]),
                          entrada: soma(R.entFase[i]), parcelas: soma(R.parcFase[i]),
                          receita: soma(R.recFase[i]) } };

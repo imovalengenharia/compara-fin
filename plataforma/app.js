@@ -832,6 +832,64 @@
     f.appendChild(quadro('Fluxo das receitas', 'mês a mês, do primeiro lote vendido ao último recebimento',
       [caixaVendas]));
 
+    /* A mesma receita vista pela safra, como na aba de vendas da planilha:
+       cada coluna é o mês em que se vendeu, e desce recebendo. A soma das
+       colunas é a receita da fase; os grupos são as janelas de venda. */
+    var caixaSafras = e('div');
+    atualizadores.push(function (r) {
+      caixaSafras.textContent = '';
+      var d = r.receitaFase[fi];
+      if (!d || !d.safras.length) return;
+      var sf = d.safras, m0 = d.meses[0].mes, m1 = d.meses[d.meses.length - 1].mes;
+
+      var grupos = e('tr', { cls: 'grupos' }, [e('th', { colspan: 2, txt: '' })]);
+      var atual = -1, aberto = null;
+      sf.forEach(function (c) {
+        if (c.janela !== atual) {
+          atual = c.janela;
+          aberto = e('th', { colspan: 1, txt: d.janelas[c.janela] });
+          grupos.appendChild(aberto);
+        } else aberto.setAttribute('colspan', +aberto.getAttribute('colspan') + 1);
+      });
+      var cab = e('tr', {}, [e('th', { txt: 'Mês' }), e('th', { txt: 'Recebido' })].concat(
+        sf.map(function (c) { return e('th', { txt: 'venda ' + c.mes }); })));
+
+      var tb = e('tbody');
+      function linhaParam(rot, fn, cls) {
+        tb.appendChild(e('tr', { cls: cls || '' }, [e('td', { txt: rot }), e('td', { cls: 'cond', txt: '\u2014' })]
+          .concat(sf.map(function (c) { return e('td', { txt: fn(c) }); }))));
+      }
+      linhaParam('Lotes vendidos', function (c) { return c.lotes > 0 ? n(c.lotes, 2) : '\u00b7'; });
+      linhaParam('Contratado (R$)', function (c) { return n(c.vgv, 0); });
+      linhaParam('Entrada (R$)', function (c) { return n(c.entrada, 0); });
+      linhaParam('1ª parcela (R$)', function (c) {
+        return c.parcela > 0.5 ? n(c.parcela, 0) : '\u00b7'; }, 'soma');
+
+      for (var m = m0; m <= m1; m++) {
+        var linha = d.meses[m - m0];
+        var tr = e('tr', {}, [e('td', { txt: nz(m, 0) }),
+                              e('td', { txt: linha.receita > 0.5 ? n(linha.receita, 0) : '\u00b7' })]);
+        for (var k = 0; k < sf.length; k++) {
+          var v = sf[k].serie[m];
+          tr.appendChild(e('td', { txt: v > 0.5 ? n(v, 0) : '\u00b7' }));
+        }
+        tb.appendChild(tr);
+      }
+      caixaSafras.appendChild(e('div', { cls: 'rolagem' },
+        [e('table', { cls: 'dados compacto safras' }, [e('thead', {}, [grupos, cab]), tb])]));
+      caixaSafras.appendChild(e('p', { cls: 'nota-bloco', txt:
+        'Cada coluna é um mês de venda e desce recebendo: a entrada no próprio mês, depois a parcela. ' +
+        'A parcela é fixa em moeda nominal, então encolhe ao descer a coluna — é o IPCA corroendo o que ' +
+        'o comprador paga. A soma das ' + sf.length + ' colunas é a receita da fase, ' + R$(d.totais.receita) + '. ' +
+        'Os grupos são as janelas de venda: ' +
+        [0, 1, 2].map(function (j) {
+          return sf.filter(function (c) { return c.janela === j; }).length + ' no ' +
+                 d.janelas[j].toLowerCase().replace('vendas ', '');
+        }).join(', ') + '.' }));
+    });
+    f.appendChild(quadro('Safras de venda', 'uma coluna por mês de venda, como na aba de vendas da planilha',
+      [caixaSafras]));
+
     var res = e('div');
     atualizadores.push(function (r) {
       res.textContent = '';
