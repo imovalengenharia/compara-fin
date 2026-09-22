@@ -1138,15 +1138,6 @@
         ['Registro e ITBI', R$(-r.totais.itbi), pc(usual('custos.outrosTerreno')) + ' do equivalente à vista']
       ]));
 
-      boxTopo.appendChild(e('div', { style: 'margin-top:14px' }, [
-        quadro('Curva do caixa', 'o capital exposto e devolvido, mês a mês',
-          [curvaDoCaixa(r),
-           e('p', { cls: 'nota-bloco', txt:
-             'Abaixo da linha do zero é capital exposto; acima, capital já devolvido. O fundo do vale ' +
-             'é o investimento que o empreendimento exige — ' + mi(-i.exposicao) + ' no mês ' +
-             i.mesExposicao + ' — e o cruzamento do zero é o payback, no mês ' + i.payback + '. ' +
-             'Passe o cursor para ler qualquer mês; a tabela inteira está na aba Fluxo de caixa.' })])
-      ]));
 
       var linhas = [
         ['Receita de vendas recebida', T.receita, 'soma'],
@@ -1246,6 +1237,16 @@
         boxFim.appendChild(quadro('Resultado por fase', null,
           [e('div', { style: 'overflow-x:auto' }, [e('table', { cls: 'dados' }, [e('thead', {}, [th2]), tb2])])]));
       }
+
+      boxFim.appendChild(e('div', { style: 'margin-top:14px' }, [
+        quadro('Curva do caixa', 'o capital exposto e devolvido, mês a mês',
+          [curvaDoCaixa(r),
+           e('p', { cls: 'nota-bloco', txt:
+             'Abaixo da linha do zero é capital exposto; acima, capital já devolvido. O fundo do vale ' +
+             'é o investimento que o empreendimento exige — ' + mi(-i.exposicao) + ' no mês ' +
+             i.mesExposicao + ' — e o cruzamento do zero é o payback, no mês ' + i.payback + '. ' +
+             'Passe o cursor para ler qualquer mês; a tabela inteira está na aba Fluxo de caixa.' })])
+      ]));
 
       var chips = e('div', { cls: 'chips' });
       r.checks.forEach(function (c) {
