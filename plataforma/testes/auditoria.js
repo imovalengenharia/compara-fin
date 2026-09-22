@@ -195,6 +195,62 @@ conferir('venda à vista · o retorno ao investidor não ignora essa despesa',
          aVista.ind.retorno - aVista.ind.investimento, aVista.ind.resultado, { abs: 1 });
 coerencia(aVista, 'venda à vista');
 
+/* Um cenário por defeito que a auditoria do motor encontrou: cada um destes
+   falha no motor anterior. Sem isso, a correção não fica travada. */
+B('2d · OS DEFEITOS CORRIGIDOS — cada um com o cenário que o expunha');
+
+var umaParcela = Motor.calcular(ITU(function (P) {
+  P.planos = [{ n: 1, mix: 1, entrada: 0.5, desconto: 0, correcao: 0.05, jurosReal: 0.08 }]
+    .concat(P.planos.slice(1).map(function (pl) {
+      return { n: pl.n, mix: 0, entrada: pl.entrada, desconto: pl.desconto,
+               correcao: pl.correcao, jurosReal: pl.jurosReal };
+    }));
+}));
+conferir('plano de uma parcela · o saldo financiado é recebido',
+         umaParcela.totais.receita > umaParcela.ind.vgv * 0.98, true);
+
+var preOpCurto = Motor.calcular(ITU(function (P) { P.prazos.preOp = 1; }));
+var preOpLongo = Motor.calcular(ITU(function (P) { P.prazos.preOp = 18; }));
+conferir('pré-operacional curto · o marketing não some no horizonte',
+         preOpCurto.totais.marketing, preOpLongo.totais.marketing, { rel: 0.001 });
+conferir('pré-operacional curto · o stand não some no horizonte',
+         preOpCurto.totais.stand, preOpLongo.totais.stand, { rel: 0.001 });
+
+var longo = Motor.calcular(ITU(function (P) {
+  P.prazos.preOp = 120; P.prazos.nFases = 4;
+  [0, 1, 2, 3].forEach(function (k) { if (P.fases[k]) P.fases[k].ativa = true; });
+}));
+conferir('recebimento além do horizonte · o controle acusa',
+         longo.checks.some(function (c) { return !c.ok; }), true);
+
+var obraCurta = Motor.calcular(ITU(function (P) { P.fases[0].prazoObra = 3; }));
+var ultimaEtapa = obraCurta.fases[0].etapas[3];
+conferir('obra de 3 meses · a curva não passa da entrega',
+         ultimaEtapa.fim <= obraCurta.fases[0].obraFim, true);
+conferir('obra de 3 meses · as etapas somam o prazo',
+         obraCurta.fases[0].etapas.reduce(function (a, e) { return a + e.dur; }, 0), 3, { abs: 0 });
+conferir('obra de 3 meses · as etapas somam 100% da obra',
+         obraCurta.fases[0].etapas.reduce(function (a, e) { return a + e.pct; }, 0) * 100, 100, { abs: 0.01 });
+
+var mixZero = [180, 400].map(function (n) {
+  return Motor.calcular(ITU(function (P) {
+    P.planos[4] = { n: n, mix: 0, entrada: P.planos[4].entrada, desconto: P.planos[4].desconto,
+                    correcao: P.planos[4].correcao, jurosReal: P.planos[4].jurosReal };
+  }));
+});
+conferir('plano que não vende · o prazo dele não estica a despesa',
+         mixZero[0].totais.admvendas, mixZero[1].totais.admvendas, { rel: 0.0001 });
+
+/* negativo gasta antes do lançamento, positivo só depois dele — a parcela
+   pós-lançamento começa no lançamento nos dois casos */
+var mkt = [-6, 6].map(function (v) {
+  var r = Motor.calcular(ITU(function (P) { P.janelas.mktAntes = v; }));
+  var lanc = r.fases[0].lanc;
+  return r.meses.filter(function (m) { return m.mes < lanc && Math.abs(m.marketing) > 0.5; }).length;
+});
+conferir('marketing · negativo gasta antes do lançamento', mkt[0], 6, { abs: 0 });
+conferir('marketing · positivo não gasta antes do lançamento', mkt[1], 0, { abs: 0 });
+
 /* ============================ 3 · COMPORTAMENTO ECONÔMICO =============== */
 B('3 · COMPORTAMENTO ECONÔMICO — o modelo responde na direção certa');
 var vP = resolvidos['permuta'].ind.equivalenteVista;

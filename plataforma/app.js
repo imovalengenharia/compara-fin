@@ -733,8 +733,12 @@
     ]));
 
     var linhasEtapa = [
-      { rot: 'Início', cels: [0, 1, 2, 3].map(function (i) { return calc(function (r) { return n(F(r).etapas[i].ini, 0); }); }) },
-      { rot: 'Fim', cels: [0, 1, 2, 3].map(function (i) { return calc(function (r) { return n(F(r).etapas[i].fim, 0); }); }) },
+      /* etapa sem mês nenhum — obra curta demais para quatro — não tem início
+         nem fim para mostrar: o percentual dela foi para a etapa seguinte */
+      { rot: 'Início', cels: [0, 1, 2, 3].map(function (i) {
+          return calc(function (r) { var et = F(r).etapas[i]; return et.dur > 0 ? n(et.ini, 0) : VAZIO; }); }) },
+      { rot: 'Fim', cels: [0, 1, 2, 3].map(function (i) {
+          return calc(function (r) { var et = F(r).etapas[i]; return et.dur > 0 ? n(et.fim, 0) : VAZIO; }); }) },
       { rot: 'Duração (meses)', cels: [0, 1, 2, 3].map(function (i) { return calc(function (r) { return n(F(r).etapas[i].dur, 0); }); }) },
       { rot: '% da obra da fase', cels: [
           inp('fases.' + fi + '.etapa1', 'pct'), inp('fases.' + fi + '.etapa2', 'pct'),

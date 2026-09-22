@@ -161,6 +161,25 @@
   /* ------------------------------------------------------------ vendas */
   /* Simula fase a fase. A fase seguinte só lança quando a anterior atinge
      o gatilho de vendas — exatamente como 'VENDAS Fn'!C5 faz na planilha. */
+    /* Quatro etapas de ¼ do prazo. Com prazo curto demais para quatro meses,
+       a divisão justa deixa etapas vazias, e o percentual delas vai para a
+       etapa seguinte — em vez de a obra passar da entrega. */
+    function etapasDaObra(prazo, pcts) {
+      var dEt = Math.trunc(prazo / 4), durs;
+      if (dEt > 0) durs = [dEt, dEt, dEt, prazo - 3 * dEt];
+      else durs = [0, 1, 2, 3].map(function (e) {
+        return Math.floor((e + 1) * prazo / 4) - Math.floor(e * prazo / 4);
+      });
+      var saldo = 0, saida = [];
+      for (var e = 0; e < 4; e++) {
+        if (durs[e] <= 0) { saldo += pcts[e]; saida.push({ dur: 0, pct: 0 }); continue; }
+        saida.push({ dur: durs[e], pct: pcts[e] + saldo });
+        saldo = 0;
+      }
+      if (saldo > 0) for (var z2 = 3; z2 >= 0; z2--) if (saida[z2].dur > 0) { saida[z2].pct += saldo; break; }
+      return saida;
+    }
+
   function cronogramaEVendas(P, prog) {
     var fases = [], vendas = [];   // vendas[f][produto][mês do projeto]
     var lancAnterior = null, gatilhoAnterior = null;
@@ -206,14 +225,14 @@
         mesesCom.push(mCom);
         if (lotesFase[p3] > 0 && mCom < HORIZONTE) vend[p3][mCom] += lotesFase[p3];
       });
-      var dEt = Math.trunc(prazoObra / 4), durs = [dEt, dEt, dEt, prazoObra - 3 * dEt];
       var pcts = [num(cfg.etapa1), num(cfg.etapa2), num(cfg.etapa3)];
       pcts.push(1 - pcts[0] - pcts[1] - pcts[2]);
+      var passos = etapasDaObra(prazoObra, pcts);
       var cursor = obraIni, etapas = [];
       for (var e = 0; e < 4; e++) {
-        etapas.push({ n: e + 1, ini: cursor, fim: cursor + Math.max(1, durs[e]) - 1,
-                      dur: Math.max(1, durs[e]), pct: pcts[e], residual: e === 3 });
-        cursor += Math.max(1, durs[e]);
+        etapas.push({ n: e + 1, ini: cursor, fim: cursor + passos[e].dur - 1,
+                      dur: passos[e].dur, pct: passos[e].pct, residual: e === 3 });
+        cursor += passos[e].dur;
       }
       var janelas = [
         { nome: 'Lançamento',    pct: velLanc, dur: janLanc,   vso: janLanc ? velLanc / janLanc : 0 },
@@ -244,6 +263,9 @@
   function receitas(P, prog, cron) {
     var ipca = num(P.indices.ipca), N = HORIZONTE;
     var rec = z(), recRes = z(), recCom = z(), vgvVendido = z(), entradas = z(), parcelas = z();
+    /* o que vence depois do horizonte não pode sumir calado: é medido e
+       acusado, porque o estudo estaria mostrando menos receita do que existe */
+    var cortado = 0;
     var recFase = [z(), z(), z(), z()];
     /* a receita da fase, aberta nas peças que a formam: o que é contratado no
        mês, o que entra de sinal e o que chega das parcelas de meses anteriores */
@@ -254,8 +276,7 @@
     var safras = [{}, {}, {}, {}];
     function safra(fase, mv) {
       var mapa = safras[fase];
-      if (!mapa[mv]) mapa[mv] = { mes: mv, lotes: 0, vgv: 0, entrada: 0, parcela: 0,
-                                  parcelas: 0, serie: z() };
+      if (!mapa[mv]) mapa[mv] = { mes: mv, lotes: 0, vgv: 0, entrada: 0, parcela: 0, serie: z() };
       return mapa[mv];
     }
     var planos = P.planos.map(function (pl) {
@@ -263,7 +284,7 @@
       var jrReal = num(pl.jurosReal);
       var jn = Math.pow((1 + jrReal) * (1 + ipca), 1 / 12) - 1;   // nominal equivalente
       return { n: n, mix: num(pl.mix), entrada: num(pl.entrada), desconto: num(pl.desconto),
-               correcao: num(pl.correcao), fator: n > 1 ? pmtFator(jn, n) : 0 };
+               correcao: num(pl.correcao), fator: n >= 1 ? pmtFator(jn, n) : 0 };
     });
     function def(m) { return Math.pow(1 + ipca, -m / 12); }
 
@@ -292,17 +313,20 @@
           sf.vgv += valor * def(m); sf.entrada += ent * def(m);
           sf.serie[m] += ent * def(m);
         }
+        /* um plano de uma parcela tem uma parcela: descartá-la sumia com o
+           saldo financiado enquanto o VGV já tinha recebido o valor cheio */
         var fin = valor * (1 - pl.entrada);
-        if (fin <= 0 || pl.n <= 1) continue;
+        if (fin <= 0 || pl.n < 1) continue;
         var pmt = fin * pl.fator;                      // parcela FIXA em moeda nominal
-        for (var t = 1; t <= pl.n && m + t < N; t++) {
+        for (var t = 1; t <= pl.n; t++) {
+          if (m + t >= N) { cortado += pmt * def(m + t); continue; }
           var v = pmt * def(m + t);
           rec[m + t] += v; porTipo[m + t] += v; parcelas[m + t] += v;
           if (fase >= 0) {
             recFase[fase][m + t] += v; parcFase[fase][m + t] += v;
             var sp = safra(fase, m);
             sp.serie[m + t] += v;
-            if (t === 1) { sp.parcela += pmt * def(m + 1); sp.parcelas = Math.max(sp.parcelas, pl.n); }
+            if (t === 1) sp.parcela += pmt * def(m + 1);
           }
         }
       }
@@ -323,7 +347,7 @@
              entradas: entradas, parcelas: parcelas,
              recFase: recFase, entFase: entFase, parcFase: parcFase,
              vgvFase: vgvFase, lotesFase: lotesFase, safras: safras,
-             ultimoRecebimento: ultimo, planos: planos };
+             ultimoRecebimento: ultimo, cortado: cortado, planos: planos };
   }
 
   /* --------------------------------------------------- contas e fluxo */
@@ -348,11 +372,16 @@
     var bancV = num(C.bancarias) * prog.vgv;
     var cgaV = num(C.cga) * prog.vgv;
 
+    /* O que vence fora do horizonte era descartado em silêncio, e como só
+       despesas usam espalhar, o erro era sempre a favor do valor da gleba.
+       Agora a parcela encosta na borda e a manobra fica registrada. */
+    var empurrado = 0;
     function espalhar(alvo, valor, ini, dur, inflator) {
       if (valor === 0 || dur <= 0) return;
       for (var k = 0; k < dur; k++) {
-        var m = Math.round(ini + k);
-        if (m >= 0 && m < N) alvo[m] += (valor / dur) * inflator(m);
+        var m = Math.round(ini + k), mc = Math.min(N - 1, Math.max(0, m));
+        if (mc !== m) empurrado += Math.abs(valor / dur);
+        alvo[mc] += (valor / dur) * inflator(mc);
       }
     }
     /* O pagamento em dinheiro sai em duas peças: o sinal na assinatura, no
@@ -378,33 +407,34 @@
     cron.fases.forEach(function (fa, i) {
       var peso = prog.fases[i].totalLotes / Math.max(1, prog.lotes);
       obraFase[i] = obraExec * peso;
-      var etapas = [num(P.fases[i].etapa1), num(P.fases[i].etapa2), num(P.fases[i].etapa3)];
-      etapas.push(1 - etapas[0] - etapas[1] - etapas[2]);
-      var dur = Math.trunc(fa.prazoObra / 4), durs = [dur, dur, dur, fa.prazoObra - 3 * dur];
       var cursor = fa.obraIni;
-      for (var e = 0; e < 4; e++) {
-        espalhar(col.obra, obraExec * peso * etapas[e], cursor, Math.max(1, durs[e]), fINCC);
-        cursor += durs[e];
-      }
+      fa.etapas.forEach(function (et) {
+        if (et.dur > 0) espalhar(col.obra, obraExec * peso * et.pct, cursor, et.dur, fINCC);
+        cursor += et.dur;
+      });
       espalhar(col.contrap, contrapV * peso, fa.obraIni + num(J.contrapAnteObra, -3),
                Math.max(1, num(J.contrapDur, 6)), fINCC);
       espalhar(col.manut, manutV * peso * num(J.manutP1, 0.7), fa.obraFim,
                Math.max(1, num(J.manutT1, 24)), fIPCA);
       espalhar(col.manut, manutV * peso * num(J.manutP2, 0.3), fa.obraFim + num(J.manutT1, 24),
                Math.max(1, num(J.manutT2, 12)), fIPCA);
-      var antes = Math.abs(num(J.mktAntes, -6));
-      espalhar(col.marketing, (mktV / cron.fases.length) * num(J.mktPctAntes, 0.6), fa.lanc - antes,
-               Math.max(1, antes), fIPCA);
-      espalhar(col.marketing, (mktV / cron.fases.length) * (1 - num(J.mktPctAntes, 0.6)), fa.lanc,
+      /* negativo antecede o lançamento, positivo o segue — como diz a nota do
+         campo e como contrapAnteObra já fazia */
+      var antes = num(J.mktAntes, -6);
+      espalhar(col.marketing, mktV * peso * num(J.mktPctAntes, 0.6), fa.lanc + antes,
+               Math.max(1, Math.abs(antes)), fIPCA);
+      espalhar(col.marketing, mktV * peso * (1 - num(J.mktPctAntes, 0.6)), fa.lanc,
                Math.max(1, num(J.mktDepois, 36)), fIPCA);
     });
-    var f1 = cron.fases[0], antesStand = Math.abs(num(J.standAntes, -3));
+    var f1 = cron.fases[0], antesStand = num(J.standAntes, -3);
     var fimStand = cron.fases[cron.fases.length - 1].fimVendas;
-    espalhar(col.stand, standV * num(J.standPctAntes, 0.3), f1.lanc - antesStand,
-             Math.max(1, antesStand), fIPCA);
+    espalhar(col.stand, standV * num(J.standPctAntes, 0.3), f1.lanc + antesStand,
+             Math.max(1, Math.abs(antesStand)), fIPCA);
     espalhar(col.stand, standV * (1 - num(J.standPctAntes, 0.3)), f1.lanc,
              Math.max(1, fimStand - f1.lanc + 1), fIPCA);
-    var maxParc = Math.max.apply(null, P.planos.map(function (p) { return num(p.n); }));
+    /* plano com mix zero não vende nada: o prazo dele não estica a despesa */
+    var maxParc = Math.max.apply(null, P.planos.filter(function (p) { return num(p.mix) > 0; })
+                                               .map(function (p) { return num(p.n); }).concat([1]));
     var fimAdm = fimStand + maxParc;
     espalhar(col.admvendas, admV, f1.lanc, Math.max(1, fimAdm - f1.lanc + 1), fIPCA);
     espalhar(col.bancarias, bancV, f1.lanc, Math.max(1, fimAdm - f1.lanc + 1), fIPCA);
@@ -438,7 +468,7 @@
              valores: { obraTotal: obraTotal, preOpV: preOpV, obraExec: obraExec, itbiV: itbiV,
                         contrapV: contrapV, manutV: manutV, mktV: mktV, standV: standV,
                         admV: admV, bancV: bancV, cgaV: cgaV, aquisicao: aquisicao,
-                        sinalPago: sinal } };
+                        sinalPago: sinal, empurrado: empurrado } };
   }
 
   /* Fluxo do investidor, na mesma construção das colunas AR..AW da planilha:
@@ -653,7 +683,10 @@
           return num(f.velLanc) + num(f.velPos) <= 1; }),
         txt: 'Lançamento + pós-obra não passam de 100% das vendas' },
       { ok: alvFolga >= -0.5, txt: 'O programa de vendas cabe na ALV disponível' },
-      { ok: R.ultimoRecebimento <= HORIZONTE - 1, txt: 'O ciclo de recebimentos cabe no horizonte' },
+      /* os dois controles que faltavam: nada de dinheiro pode sumir por cair
+         fora do horizonte, nem receita adiante nem despesa atrás */
+      { ok: R.cortado < 1, txt: 'Nenhuma parcela vence depois do horizonte' },
+      { ok: M.valores.empurrado < 1, txt: 'Nenhuma despesa foi empurrada para dentro do horizonte' },
       { ok: tirReal !== null, txt: 'A TIR converge' },
       { ok: tma < num(idx.cdi) * num(idx.multiplo) + 1e-9, txt: 'A TMA está em termos reais, comparável com a TIR' },
       { ok: prog.prods.every(function (r, i) {
@@ -737,7 +770,7 @@
       var colunas = lista.map(function (mv) {
         var sf = R.safras[i][mv];
         return { mes: mv, lotes: sf.lotes, vgv: sf.vgv, entrada: sf.entrada,
-                 parcela: sf.parcela, parcelas: sf.parcelas, serie: sf.serie,
+                 parcela: sf.parcela, serie: sf.serie,
                  janela: mv <= f.lancFim ? 0 : mv < f.obraIni + f.prazoObra ? 1 : 2 };
       });
       return { fase: f.i, meses: linhas, safras: colunas,
