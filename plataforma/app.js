@@ -789,52 +789,9 @@
         }, true)
     ]));
 
-    /* O fluxo das receitas da fase, mês a mês, como na planilha: o que foi
-       contratado, o que entrou de sinal, o que chegou das parcelas e o que
-       ainda falta entrar. Só os meses em que algo acontece. */
-    var caixaVendas = e('div');
-    atualizadores.push(function (r) {
-      caixaVendas.textContent = '';
-      var d = r.receitaFase[fi];
-      if (!d || !d.meses.length) {
-        caixaVendas.appendChild(e('p', { cls: 'nota-bloco', txt: 'Esta fase ainda não vende nada.' }));
-        return;
-      }
-      var cols = [['lotes', 'Lotes vendidos'], ['vgv', 'Contratado no mês'], ['entrada', 'Entradas'],
-                  ['parcelas', 'Parcelas'], ['receita', 'Recebido no mês'],
-                  ['acumulada', 'Recebido acumulado'], ['aReceber', 'A receber']];
-      var thead = e('tr', {}, [e('th', { txt: 'Mês' })].concat(
-        cols.map(function (c) { return e('th', { txt: c[1] }); })));
-      var tb = e('tbody');
-      var tot = e('tr', { cls: 'total' }, [e('td', { txt: 'Total' })].concat(
-        cols.map(function (c) {
-          /* acumulado e a receber são leituras de linha, não somas de coluna */
-          if (c[0] === 'acumulada' || c[0] === 'aReceber') return e('td', { cls: 'cond', txt: '—' });
-          return e('td', { txt: c[0] === 'lotes' ? n(d.totais.lotes, 0) : n(d.totais[c[0]], 0) });
-        })));
-      tb.appendChild(tot);
-      d.meses.forEach(function (m) {
-        tb.appendChild(e('tr', {}, [e('td', { txt: nz(m.mes, 0) })].concat(
-          cols.map(function (c) {
-            var v = m[c[0]];
-            if (c[0] === 'lotes') return e('td', { txt: v > 0 ? n(v, 2) : '·' });
-            return e('td', { txt: Math.abs(v) < 0.5 ? '·' : n(v, 0) });
-          }))));
-      });
-      caixaVendas.appendChild(e('div', { cls: 'rolagem' },
-        [e('table', { cls: 'dados compacto' }, [e('thead', {}, [thead]), tb])]));
-      caixaVendas.appendChild(e('p', { cls: 'nota-bloco', txt:
-        'Valores em moeda da data-base. A entrada cai no mês da venda; a parcela é fixa em moeda nominal, ' +
-        'calculada pela Price sobre o preço corrigido até a venda. Por isso a fase recebe ' +
-        R$(d.totais.receita) + ' sobre ' + R$(d.totais.vgv) + ' contratados: a diferença de ' +
-        R$(d.totais.receita - d.totais.vgv) + ' é o juro real da carteira.' }));
-    });
-    f.appendChild(quadro('Fluxo das receitas', 'mês a mês, do primeiro lote vendido ao último recebimento',
-      [caixaVendas]));
-
-    /* A mesma receita vista pela safra, como na aba de vendas da planilha:
-       cada coluna é o mês em que se vendeu, e desce recebendo. A soma das
-       colunas é a receita da fase; os grupos são as janelas de venda. */
+    /* A receita da fase pela safra, como na aba de vendas da planilha: cada
+       coluna é o mês em que se vendeu, e desce recebendo. À esquerda, a
+       leitura do mês: o que entrou, o que já entrou e o que falta entrar. */
     var caixaSafras = e('div');
     atualizadores.push(function (r) {
       caixaSafras.textContent = '';
@@ -842,7 +799,7 @@
       if (!d || !d.safras.length) return;
       var sf = d.safras, m0 = d.meses[0].mes, m1 = d.meses[d.meses.length - 1].mes;
 
-      var grupos = e('tr', { cls: 'grupos' }, [e('th', { colspan: 2, txt: '' })]);
+      var grupos = e('tr', { cls: 'grupos' }, [e('th', { colspan: 4, txt: '' })]);
       var atual = -1, aberto = null;
       sf.forEach(function (c) {
         if (c.janela !== atual) {
@@ -851,12 +808,15 @@
           grupos.appendChild(aberto);
         } else aberto.setAttribute('colspan', +aberto.getAttribute('colspan') + 1);
       });
-      var cab = e('tr', {}, [e('th', { txt: 'Mês' }), e('th', { txt: 'Recebido' })].concat(
+      var cab = e('tr', {}, [e('th', { txt: 'Mês' }), e('th', { txt: 'Recebido' }),
+                             e('th', { txt: 'Acumulado' }), e('th', { txt: 'A receber' })].concat(
         sf.map(function (c) { return e('th', { txt: 'venda ' + c.mes }); })));
 
       var tb = e('tbody');
       function linhaParam(rot, fn, cls) {
-        tb.appendChild(e('tr', { cls: cls || '' }, [e('td', { txt: rot }), e('td', { cls: 'cond', txt: '\u2014' })]
+        tb.appendChild(e('tr', { cls: cls || '' }, [e('td', { txt: rot }),
+          e('td', { cls: 'cond', txt: '\u2014' }), e('td', { cls: 'cond', txt: '\u2014' }),
+          e('td', { cls: 'cond', txt: '\u2014' })]
           .concat(sf.map(function (c) { return e('td', { txt: fn(c) }); }))));
       }
       linhaParam('Lotes vendidos', function (c) { return c.lotes > 0 ? n(c.lotes, 2) : '\u00b7'; });
@@ -868,7 +828,9 @@
       for (var m = m0; m <= m1; m++) {
         var linha = d.meses[m - m0];
         var tr = e('tr', {}, [e('td', { txt: nz(m, 0) }),
-                              e('td', { txt: linha.receita > 0.5 ? n(linha.receita, 0) : '\u00b7' })]);
+                              e('td', { txt: linha.receita > 0.5 ? n(linha.receita, 0) : '\u00b7' }),
+                              e('td', { cls: 'cond', txt: n(linha.acumulada, 0) }),
+                              e('td', { cls: 'cond', txt: linha.aReceber > 0.5 ? n(linha.aReceber, 0) : '\u00b7' })]);
         for (var k = 0; k < sf.length; k++) {
           var v = sf[k].serie[m];
           tr.appendChild(e('td', { txt: v > 0.5 ? n(v, 0) : '\u00b7' }));
@@ -880,14 +842,15 @@
       caixaSafras.appendChild(e('p', { cls: 'nota-bloco', txt:
         'Cada coluna é um mês de venda e desce recebendo: a entrada no próprio mês, depois a parcela. ' +
         'A parcela é fixa em moeda nominal, então encolhe ao descer a coluna — é o IPCA corroendo o que ' +
-        'o comprador paga. A soma das ' + sf.length + ' colunas é a receita da fase, ' + R$(d.totais.receita) + '. ' +
+        'o comprador paga. A soma das ' + sf.length + ' colunas é a receita da fase, ' + R$(d.totais.receita) +
+        ', sobre ' + R$(d.totais.vgv) + ' contratados: a diferença é o juro real da carteira. ' +
         'Os grupos são as janelas de venda: ' +
         [0, 1, 2].map(function (j) {
           return sf.filter(function (c) { return c.janela === j; }).length + ' no ' +
                  d.janelas[j].toLowerCase().replace('vendas ', '');
         }).join(', ') + '.' }));
     });
-    f.appendChild(quadro('Safras de venda', 'uma coluna por mês de venda, como na aba de vendas da planilha',
+    f.appendChild(quadro('Fluxo de receitas', 'uma coluna por mês de venda, como na aba de vendas da planilha',
       [caixaSafras]));
 
     var res = e('div');
