@@ -245,6 +245,10 @@
     var ipca = num(P.indices.ipca), N = HORIZONTE;
     var rec = z(), recRes = z(), recCom = z(), vgvVendido = z(), entradas = z(), parcelas = z();
     var recFase = [z(), z(), z(), z()];
+    /* a receita da fase, aberta nas peças que a formam: o que é contratado no
+       mês, o que entra de sinal e o que chega das parcelas de meses anteriores */
+    var entFase = [z(), z(), z(), z()], parcFase = [z(), z(), z(), z()],
+        vgvFase = [z(), z(), z(), z()], lotesFase = [z(), z(), z(), z()];
     var planos = P.planos.map(function (pl) {
       var n = Math.max(0, Math.round(num(pl.n)));
       var jrReal = num(pl.jurosReal);
@@ -271,29 +275,37 @@
         vgvVendido[m] += valor * def(m);
         var ent = valor * pl.entrada;
         rec[m] += ent * def(m); porTipo[m] += ent * def(m); entradas[m] += ent * def(m);
-        if (fase >= 0) recFase[fase][m] += ent * def(m);
+        if (fase >= 0) {
+          recFase[fase][m] += ent * def(m);
+          entFase[fase][m] += ent * def(m);
+          vgvFase[fase][m] += valor * def(m);
+        }
         var fin = valor * (1 - pl.entrada);
         if (fin <= 0 || pl.n <= 1) continue;
         var pmt = fin * pl.fator;                      // parcela FIXA em moeda nominal
         for (var t = 1; t <= pl.n && m + t < N; t++) {
           var v = pmt * def(m + t);
           rec[m + t] += v; porTipo[m + t] += v; parcelas[m + t] += v;
-          if (fase >= 0) recFase[fase][m + t] += v;
+          if (fase >= 0) { recFase[fase][m + t] += v; parcFase[fase][m + t] += v; }
         }
       }
     }
     for (var f = 0; f < cron.fases.length; f++) {
       for (var p = 0; p < prog.prods.length; p++) {
         var pr = prog.prods[p], serie = cron.vendas[f][p];
-        for (var m = 0; m < N; m++) if (serie[m] > 0)
+        for (var m = 0; m < N; m++) if (serie[m] > 0) {
+          lotesFase[f][m] += serie[m];
           vender(serie[m], pr.precoLote, m, f, pr.pagamento, pr.tipo === 'comercial');
+        }
       }
     }
     var ultimo = 0;
     for (var q = 0; q < N; q++) if (rec[q] > 0.5) ultimo = q;
     return { rec: rec, recRes: recRes, recCom: recCom, vgvVendido: vgvVendido,
              entradas: entradas, parcelas: parcelas,
-             recFase: recFase, ultimoRecebimento: ultimo, planos: planos };
+             recFase: recFase, entFase: entFase, parcFase: parcFase,
+             vgvFase: vgvFase, lotesFase: lotesFase,
+             ultimoRecebimento: ultimo, planos: planos };
   }
 
   /* --------------------------------------------------- contas e fluxo */
@@ -668,10 +680,38 @@
                resultado: recTotais[i] + obra + ger + part * proporcionais + part * rateadas };
     });
 
+    /* A receita da fase, mês a mês: só os meses em que algo acontece, do
+       primeiro lote vendido ao último recebimento. Cada linha fecha em
+       contratado, entrada, parcelas e carteira que resta a receber. */
+    var receitaFase = cron.fases.map(function (f, i) {
+      var ini = -1, fim = -1;
+      for (var m = 0; m < HORIZONTE; m++) {
+        var houve = R.lotesFase[i][m] > 0 || R.recFase[i][m] > 0.5;
+        if (houve && ini < 0) ini = m;
+        if (houve) fim = m;
+      }
+      /* o que falta entrar não é contratado menos recebido: a parcela carrega
+         juro real, então a carteira vale mais que o preço contratado. O saldo
+         honesto é o próprio recebimento futuro. */
+      var total = soma(R.recFase[i]), linhas = [], accRec = 0;
+      for (var k = Math.max(0, ini); ini >= 0 && k <= fim; k++) {
+        accRec += R.recFase[i][k];
+        linhas.push({ mes: k, lotes: R.lotesFase[i][k], vgv: R.vgvFase[i][k],
+                      entrada: R.entFase[i][k], parcelas: R.parcFase[i][k],
+                      receita: R.recFase[i][k], acumulada: accRec,
+                      aReceber: Math.max(0, total - accRec) });
+      }
+      return { fase: f.i, meses: linhas,
+               totais: { lotes: soma(R.lotesFase[i]), vgv: soma(R.vgvFase[i]),
+                         entrada: soma(R.entFase[i]), parcelas: soma(R.parcFase[i]),
+                         receita: soma(R.recFase[i]) } };
+    });
+
     return {
       colunas: COLUNAS, meses: meses, totais: totais, areas: areas, prog: prog,
       fases: cron.fases, valores: M.valores, checks: checks, produtos: produtos,
-      planosProduto: planosProduto, resultadoFase: resultadoFase, permutaSerie: M.col.permuta,
+      planosProduto: planosProduto, resultadoFase: resultadoFase, receitaFase: receitaFase,
+      permutaSerie: M.col.permuta,
       ind: {
         vgv: prog.vgv, vgvRes: prog.vgvRes, vgvCom: prog.vgvCom, alvUsada: prog.alv,
         alvFolga: alvFolga, aproveitamento: areas.gleba > 0 ? prog.alv / areas.gleba : 0,

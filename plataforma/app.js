@@ -757,17 +757,6 @@
             return calc(function (r) { return pc(F(r).janelas[i].vso); }); }) }
       ], 'A janela do lançamento dura o que a janela de lançamento dos eventos; a da obra, o prazo de obra. A venda durante a obra absorve a diferença para o total fechar 100% dos lotes da fase.')]));
 
-    f.appendChild(quadro('Gatilho de vendas', null, [
-      reg('% vendido para lançar a fase seguinte', [inp('fases.' + fi + '.gatilho', 'pct'), un('%')],
-        'Enquanto a fase atual não atinge este percentual, a seguinte não lança — é o mecanismo que protege o caixa.'),
-      reg('Gatilho atingido em', [calc(function (r) { return mes(F(r).mesGatilho); })],
-        function (r) {
-          return fi + 1 < r.fases.length
-            ? 'A fase ' + (fi + 2) + ' é lançada no mês ' + n(r.fases[fi + 1].lanc, 0) + '.'
-            : 'Não há fase seguinte ativa.';
-        }, true)
-    ]));
-
     f.appendChild(quadro('Velocidade por produto', 'lotes por mês em cada janela · comercial vende em mês único', [grade(
       ['Lançamento', 'Durante a obra', 'Pós-obra', 'Mês único'], [0, 1, 2, 3, 4].map(function (p) {
         var com = P.produtos[p].tipo === 'comercial';
@@ -788,6 +777,60 @@
         { rot: 'Parcela mensal — PMT (R$)', forte: true, cels: [0, 1, 2, 3, 4].map(function (i) {
             return calc(function (r) { return r.planosProduto[0][i].pmt ? n(r.planosProduto[0][i].pmt, 0) : '—'; }); }) }
       ])]));
+
+    f.appendChild(quadro('Gatilho de vendas', null, [
+      reg('% vendido para lançar a fase seguinte', [inp('fases.' + fi + '.gatilho', 'pct'), un('%')],
+        'Enquanto a fase atual não atinge este percentual, a seguinte não lança — é o mecanismo que protege o caixa.'),
+      reg('Gatilho atingido em', [calc(function (r) { return mes(F(r).mesGatilho); })],
+        function (r) {
+          return fi + 1 < r.fases.length
+            ? 'A fase ' + (fi + 2) + ' é lançada no mês ' + n(r.fases[fi + 1].lanc, 0) + '.'
+            : 'Não há fase seguinte ativa.';
+        }, true)
+    ]));
+
+    /* O fluxo das receitas da fase, mês a mês, como na planilha: o que foi
+       contratado, o que entrou de sinal, o que chegou das parcelas e o que
+       ainda falta entrar. Só os meses em que algo acontece. */
+    var caixaVendas = e('div');
+    atualizadores.push(function (r) {
+      caixaVendas.textContent = '';
+      var d = r.receitaFase[fi];
+      if (!d || !d.meses.length) {
+        caixaVendas.appendChild(e('p', { cls: 'nota-bloco', txt: 'Esta fase ainda não vende nada.' }));
+        return;
+      }
+      var cols = [['lotes', 'Lotes vendidos'], ['vgv', 'Contratado no mês'], ['entrada', 'Entradas'],
+                  ['parcelas', 'Parcelas'], ['receita', 'Recebido no mês'],
+                  ['acumulada', 'Recebido acumulado'], ['aReceber', 'A receber']];
+      var thead = e('tr', {}, [e('th', { txt: 'Mês' })].concat(
+        cols.map(function (c) { return e('th', { txt: c[1] }); })));
+      var tb = e('tbody');
+      var tot = e('tr', { cls: 'total' }, [e('td', { txt: 'Total' })].concat(
+        cols.map(function (c) {
+          /* acumulado e a receber são leituras de linha, não somas de coluna */
+          if (c[0] === 'acumulada' || c[0] === 'aReceber') return e('td', { cls: 'cond', txt: '—' });
+          return e('td', { txt: c[0] === 'lotes' ? n(d.totais.lotes, 0) : n(d.totais[c[0]], 0) });
+        })));
+      tb.appendChild(tot);
+      d.meses.forEach(function (m) {
+        tb.appendChild(e('tr', {}, [e('td', { txt: nz(m.mes, 0) })].concat(
+          cols.map(function (c) {
+            var v = m[c[0]];
+            if (c[0] === 'lotes') return e('td', { txt: v > 0 ? n(v, 2) : '·' });
+            return e('td', { txt: Math.abs(v) < 0.5 ? '·' : n(v, 0) });
+          }))));
+      });
+      caixaVendas.appendChild(e('div', { cls: 'rolagem' },
+        [e('table', { cls: 'dados compacto' }, [e('thead', {}, [thead]), tb])]));
+      caixaVendas.appendChild(e('p', { cls: 'nota-bloco', txt:
+        'Valores em moeda da data-base. A entrada cai no mês da venda; a parcela é fixa em moeda nominal, ' +
+        'calculada pela Price sobre o preço corrigido até a venda. Por isso a fase recebe ' +
+        R$(d.totais.receita) + ' sobre ' + R$(d.totais.vgv) + ' contratados: a diferença de ' +
+        R$(d.totais.receita - d.totais.vgv) + ' é o juro real da carteira.' }));
+    });
+    f.appendChild(quadro('Fluxo das receitas', 'mês a mês, do primeiro lote vendido ao último recebimento',
+      [caixaVendas]));
 
     var res = e('div');
     atualizadores.push(function (r) {
