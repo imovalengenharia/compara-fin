@@ -143,7 +143,7 @@ function coerencia(r, etiqueta) {
     i.caixaTerreno + i.permutaNominal, { abs: 1 });
   conferir(etiqueta + ' · nominal não é menor que o presente', i.valorTerreno >= i.equivalenteVista - 1, true);
   conferir(etiqueta + ' · ITBI = 2% do equivalente à vista', -T.itbi,
-    0.02 * (i.caixaTerreno + i.vpPermuta) * Math.pow(1.035, -1 / 12), { rel: 0.001 });
+    0.02 * i.equivalenteVista * Math.pow(1.035, -1 / 12), { rel: 0.001 });
   conferir(etiqueta + ' · receita = residencial + comercial', T.receita,
     T.receitaRes + T.receitaCom, { abs: 1 });
   conferir(etiqueta + ' · receita líquida = receita − deduções', T.liquida,
@@ -167,6 +167,33 @@ formas.forEach(function (f) {
            f[1] === 'avista' ? r.ind.caixaTerreno : f[2], { abs: 1 });
   coerencia(r, f[0]);
 });
+
+/* As faixas que os cenários acima não visitam: o terreno parcelado, onde o
+   nominal e o equivalente à vista divergem, e a venda à vista, onde despesas
+   vencem depois do último recebimento. */
+B('2c · FAIXAS DE BORDA — onde o modelo já errou');
+var parcelado = Motor.calcular(ITU(function (P) {
+  P.terreno = { modo: 'informado', forma: 'avista', valorDinheiro: 20e6, sinal: 0, permutaPct: 0 };
+  P.janelas.terrenoIni = 1; P.janelas.terrenoParc = 120;
+}));
+conferir('terreno em 120 parcelas · equivalente à vista abaixo do nominal',
+         parcelado.ind.equivalenteVista < parcelado.ind.caixaTerreno * 0.75, true);
+conferir('terreno em 120 parcelas · ITBI sobre o equivalente, não sobre o nominal',
+         -parcelado.totais.itbi, 0.02 * parcelado.ind.equivalenteVista * Math.pow(1.035, -1 / 12),
+         { rel: 0.001 });
+coerencia(parcelado, 'terreno em 120 parcelas');
+
+var aVista = Motor.calcular(ITU(function (P) {
+  P.produtos.forEach(function (pr) { if (pr.tipo !== 'comercial') pr.pagamento = 'p1'; });
+}));
+var somaTudo = aVista.meses.reduce(function (a, m) { return a + m.fluxo; }, 0);
+var ateReceb = aVista.meses.filter(function (m) { return m.mes <= aVista.ind.ultimoRecebimento; })
+                          .reduce(function (a, m) { return a + m.fluxo; }, 0);
+conferir('venda à vista · há despesa depois do último recebimento',
+         Math.abs(somaTudo - ateReceb) > 1e5, true);
+conferir('venda à vista · o retorno ao investidor não ignora essa despesa',
+         aVista.ind.retorno - aVista.ind.investimento, aVista.ind.resultado, { abs: 1 });
+coerencia(aVista, 'venda à vista');
 
 /* ============================ 3 · COMPORTAMENTO ECONÔMICO =============== */
 B('3 · COMPORTAMENTO ECONÔMICO — o modelo responde na direção certa');

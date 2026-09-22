@@ -339,7 +339,7 @@
     var preOpV = num(C.pctPreOp) * obraTotal;
     var obraExec = obraTotal - preOpV;
     var aquisicao = num(caixaTerreno);
-    var itbiV = num(C.outrosTerreno) * (aquisicao + vpPermuta);
+    var itbiV = 0;   /* depende do valor presente do caixa: calculado abaixo */
     var contrapV = num(C.contrapartidas) * prog.vgv;
     var manutV = num(C.manutencao) * obraTotal;
     var mktV = num(C.marketing) * prog.vgv;
@@ -361,6 +361,13 @@
     var sinal = Math.max(0, Math.min(aquisicao, num(Tp.sinal)));
     if (sinal > 0) col.terreno[0] += sinal;
     espalhar(col.terreno, aquisicao - sinal, num(J.terrenoIni), Math.max(1, num(J.terrenoParc, 1)), fSEM);
+    /* O ITBI incide sobre o equivalente à vista — o valor presente do que o
+       terrenista recebe, dinheiro e permuta. O caixa só vale o seu nominal
+       quando é pago à vista; parcelado, vale menos, e a base acompanha. */
+    var taxaTerr = (1 + num(idx.cdi)) / (1 + num(idx.ipca)) - 1;
+    var iTerr = Math.pow(1 + taxaTerr, 1 / 12) - 1, vpCx = 0, dCx = 1;
+    for (var mc = 0; mc < N; mc++) { vpCx += col.terreno[mc] / dCx; dCx *= (1 + iTerr); }
+    itbiV = num(C.outrosTerreno) * (vpCx + vpPermuta);
     espalhar(col.itbi, itbiV, num(J.itbiIni, 1), Math.max(1, num(J.itbiParc, 1)), fSEM);
     espalhar(col.preop, preOpV, num(J.preOpIni, 1), Math.max(1, Math.round(num(P.prazos.preOp))), fIPCA);
 
@@ -437,8 +444,13 @@
   /* Fluxo do investidor, na mesma construção das colunas AR..AW da planilha:
      AS = aporte que mantém o caixa em zero, AV = saldo acumulado já com aportes,
      AT = devolução ao investidor, AW = AS + AT (série de onde saem TIR e VPL). */
-  function fluxoInvestidor(fluxo, fim) {
+  function fluxoInvestidor(fluxo) {
+    /* O fluxo do investidor termina no último MOVIMENTO, não no último
+       recebimento: manutenção, CGA e despesas de venda vencem depois da última
+       parcela, e cortá-las inflava a TIR — sempre a favor do valor da gleba. */
     var N = fluxo.length, AS = z(), AV = z(), AT = z(), AW = z(), AR = z(), somaAS = 0, somaAT = 0;
+    var fim = 0;
+    for (var f0 = 0; f0 < N; f0++) if (Math.abs(fluxo[f0]) > 0.5) fim = f0;
     for (var t = 0; t < N; t++) AR[t] = t > fim ? 0 : Math.round(fluxo[t] * 100) / 100;
     var saldo = 0;
     for (var i = 0; i < N; i++) {
@@ -560,7 +572,7 @@
       return M;
     }
     function vplDo(M) {
-      return vplInvestidor(fluxoInvestidor(M.fluxo, R.ultimoRecebimento).AW, tma);
+      return vplInvestidor(fluxoInvestidor(M.fluxo).AW, tma);
     }
     /* Bisseção na única incógnita da forma escolhida: o dinheiro, quando a
        aquisição é à vista, ou a permuta, quando há dinheiro definido. */
@@ -594,7 +606,7 @@
 
     var N = HORIZONTE, fluxo = M.fluxo, acum = M.acum;
 
-    var INV = fluxoInvestidor(fluxo, R.ultimoRecebimento);
+    var INV = fluxoInvestidor(fluxo);
 
     var expo = Math.min.apply(null, acum), mExpo = acum.indexOf(expo);
     var pb = null; for (var m = 1; m < N; m++) if (acum[m] >= 0 && pb === null) pb = m;
