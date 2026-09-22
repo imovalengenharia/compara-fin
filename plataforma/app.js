@@ -1431,18 +1431,25 @@
     normalizarPagamentos();
     R = Motor.calcular(P);
     montarAbas(); montarFolha();
+    /* Papel é o padrão. Sem escolha salva, quem decide é o sistema: a raiz
+       fica sem marca e o CSS segue a preferência do aparelho. */
     var btnTema = document.getElementById('btn-tema');
+    function escuroAgora() {
+      var m = document.documentElement.getAttribute('data-tema');
+      if (m) return m === 'escuro';
+      try { return window.matchMedia('(prefers-color-scheme: dark)').matches; } catch (err) { return false; }
+    }
     function aplicarTema(t) {
-      if (t === 'claro') document.documentElement.setAttribute('data-tema', 'claro');
+      if (t === 'claro' || t === 'escuro') document.documentElement.setAttribute('data-tema', t);
       else document.documentElement.removeAttribute('data-tema');
-      btnTema.textContent = t === 'claro' ? 'Tema escuro' : 'Tema claro';
+      btnTema.textContent = escuroAgora() ? 'Tema claro' : 'Tema escuro';
       try { localStorage.setItem('involutivo.tema', t); } catch (err) {}
     }
-    var temaSalvo = 'escuro';
-    try { temaSalvo = localStorage.getItem('involutivo.tema') || 'escuro'; } catch (err) {}
+    var temaSalvo = 'sistema';
+    try { temaSalvo = localStorage.getItem('involutivo.tema') || 'sistema'; } catch (err) {}
     aplicarTema(temaSalvo);
     btnTema.addEventListener('click', function () {
-      aplicarTema(document.documentElement.getAttribute('data-tema') === 'claro' ? 'escuro' : 'claro');
+      aplicarTema(escuroAgora() ? 'claro' : 'escuro');
     });
     document.getElementById('btn-restaurar').addEventListener('click', function () {
       P = premissasPadrao(); rolagem = {}; recalcular(); montarFolha();

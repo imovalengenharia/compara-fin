@@ -1,45 +1,63 @@
 <meta charset="utf-8">
 <title>Involutivo de Glebas</title>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Condensed:wght@600&family=IBM+Plex+Sans:wght@400;450;500;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;450;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap">
 <style>
 /* ============================================================================
-   Tema escuro é o padrão da plataforma. O claro fica disponível no botão do
-   topo e se aplica por [data-tema="claro"] na raiz.
+   O estudo é um laudo, não um terminal: papel é o padrão, tinta é grafite e a
+   única cor forte — verde-nanquim — fica reservada ao que o avaliador decide.
+   O tema escuro é escolha, em [data-tema="escuro"]; sem escolha salva, quem
+   decide é o sistema operacional.
    Três medidas governam todo o alinhamento: --rot, --campo e --gap.
    ========================================================================== */
 :root{
-  --ground:#0D1013; --surface:#14181D; --elev:#1A1F26; --rule:#252C34; --rule-soft:#1B2128;
-  --ink:#E8EAEC; --ink2:#AEB6BF; --muted:#79838D;
-  --acento:#C2A878; --acento-forte:#D8BF92; --acento-fraco:#3A3122;
-  --link:#8FB3D9;
-  --barra-bg:#090C0F; --barra-ink:#ECEEF0; --barra-sub:#8A949E;
-  --cab-bg:#1A1F26; --cab-ink:#C2A878; --cab-sub:#79838D;
-  --campo-bg:#1A2027; --campo-borda:#303945; --campo-foco:#C2A878;
-  --pos:#6FB08C; --neg:#D98A63; --warn:#C2A878; --aviso-bg:#20191055;
-  --sombra:0 1px 2px rgba(0,0,0,.35);
+  --ground:#EDEBE4; --surface:#FAF9F5; --elev:#F2F0E9; --rule:#D2D0C6; --rule-soft:#E3E1D8;
+  --ink:#1C2226; --ink2:#4B555C; --muted:#7B848A;
+  --acento:#2C5A4C; --acento-forte:#1E4034; --acento-fraco:#DEE6E1; --acento-ink:#F2F0E9;
+  --link:#2C5A4C;
+  --barra-bg:#1C2226; --barra-ink:#F2F0E9; --barra-sub:#9AA2A1;
+  --cab-ink:#1C2226; --cab-sub:#7B848A;
+  --campo-bg:#FFFFFF; --campo-borda:#C9C7BC; --campo-foco:#2C5A4C;
+  --pos:#2C5A4C; --neg:#8C3A1E; --warn:#8A6A14; --aviso-bg:#F6F0DD;
+  --flutua:0 6px 22px rgba(28,34,38,.20);
   --rot:296px; --campo:132px; --uni:32px; --gap:24px; --dentro:8px;
   /* uma altura de linha e seis tamanhos de letra governam a plataforma
      inteira — só o fluxo de caixa, por ser denso, tem escala própria */
   --linha:34px; --alt:28px; --lh:1.45; --sufixo:21px; --prefixo:25px;
-  --t-tit:12.5px; --t-rot:12.5px; --t-val:12.5px;
+  --t-tit:15px; --t-rot:12.5px; --t-val:12.5px;
   --t-uni:11.5px; --t-nota:11.5px; --t-cab:10.5px;
   --sans:'IBM Plex Sans',system-ui,sans-serif;
-  --cond:'IBM Plex Sans Condensed','IBM Plex Sans',system-ui,sans-serif;
+  --serif:'IBM Plex Serif',Georgia,'Times New Roman',serif;
   --mono:'IBM Plex Mono',ui-monospace,monospace;
-  color-scheme:dark;
-}
-:root[data-tema="claro"]{
-  --ground:#EDF1F5; --surface:#FFFFFF; --elev:#1F4E78; --rule:#D8E0E8; --rule-soft:#EBEFF4;
-  --ink:#14202E; --ink2:#3C4B5C; --muted:#6A7A8B;
-  --acento:#1F4E78; --acento-forte:#17395A; --acento-fraco:#E8EFF6;
-  --link:#1F4E78;
-  --barra-bg:#1F4E78; --barra-ink:#FFFFFF; --barra-sub:#BCD5EA;
-  --cab-bg:#1F4E78; --cab-ink:#FFFFFF; --cab-sub:#BCD5EA;
-  --campo-bg:#E7F0FA; --campo-borda:#A9C8E6; --campo-foco:#1F4E78;
-  --pos:#1B6E52; --neg:#B4512A; --warn:#8A6410; --aviso-bg:#FDF6E7;
-  --sombra:0 1px 2px rgba(20,32,46,.05);
   color-scheme:light;
+}
+/* o escuro é o mesmo estudo à noite: grafite no lugar do papel, e o verde
+   clareia o bastante para seguir legível sobre ele */
+@media (prefers-color-scheme:dark){
+  :root:not([data-tema="claro"]){
+    --ground:#14171A; --surface:#1A1E21; --elev:#20252A; --rule:#2C3238; --rule-soft:#22272C;
+    --ink:#E7E6E1; --ink2:#AEB3B4; --muted:#7C8488;
+    --acento:#7FAE99; --acento-forte:#9CC6B2; --acento-fraco:#22312C; --acento-ink:#14171A;
+    --link:#7FAE99;
+    --barra-bg:#0E1113; --barra-ink:#EDECE7; --barra-sub:#8D9497;
+    --cab-ink:#E7E6E1; --cab-sub:#7C8488;
+    --campo-bg:#1E2327; --campo-borda:#333A40; --campo-foco:#7FAE99;
+    --pos:#7FAE99; --neg:#D08A6A; --warn:#C9A961; --aviso-bg:#2A2214;
+    --flutua:0 6px 22px rgba(0,0,0,.45);
+    color-scheme:dark;
+  }
+}
+:root[data-tema="escuro"]{
+  --ground:#14171A; --surface:#1A1E21; --elev:#20252A; --rule:#2C3238; --rule-soft:#22272C;
+  --ink:#E7E6E1; --ink2:#AEB3B4; --muted:#7C8488;
+  --acento:#7FAE99; --acento-forte:#9CC6B2; --acento-fraco:#22312C; --acento-ink:#14171A;
+  --link:#7FAE99;
+  --barra-bg:#0E1113; --barra-ink:#EDECE7; --barra-sub:#8D9497;
+  --cab-ink:#E7E6E1; --cab-sub:#7C8488;
+  --campo-bg:#1E2327; --campo-borda:#333A40; --campo-foco:#7FAE99;
+  --pos:#7FAE99; --neg:#D08A6A; --warn:#C9A961; --aviso-bg:#2A2214;
+  --flutua:0 6px 22px rgba(0,0,0,.45);
+  color-scheme:dark;
 }
 *{box-sizing:border-box}
 html,body{margin:0}
@@ -56,14 +74,11 @@ button{font:inherit;color:inherit}
 .resumo-topo div{display:flex;flex-direction:column}
 .resumo-topo .r{font-size:var(--t-cab);letter-spacing:.11em;color:var(--barra-sub);text-transform:uppercase}
 .resumo-topo .v{font-family:var(--mono);font-size:15px;font-weight:500;color:var(--barra-ink)}
-.acao{background:transparent;border:1px solid var(--rule);border-radius:5px;padding:6px 11px;
+.acao{background:transparent;border:1px solid rgba(242,240,233,.28);border-radius:3px;padding:6px 11px;
   font-size:var(--t-nota);cursor:pointer;color:var(--barra-ink);height:var(--alt)}
-:root[data-tema="claro"] .acao{border-color:rgba(255,255,255,.3)}
 .acao:hover{border-color:var(--acento);color:var(--acento)}
-:root[data-tema="claro"] .acao:hover{background:rgba(255,255,255,.16);color:#fff;border-color:#fff}
-.acao.destaque{background:var(--acento);border-color:var(--acento);color:#12161A;font-weight:500}
-.acao.destaque:hover{background:var(--acento-forte);border-color:var(--acento-forte);color:#12161A}
-:root[data-tema="claro"] .acao.destaque{background:#fff;color:var(--acento)}
+.acao.destaque{background:var(--acento);border-color:var(--acento);color:var(--acento-ink);font-weight:500}
+.acao.destaque:hover{background:var(--acento-forte);border-color:var(--acento-forte)}
 
 /* ---------- abas ---------- */
 .abas{position:sticky;top:calc(env(safe-area-inset-top,0px) + 45px);z-index:29;background:var(--surface);
@@ -87,19 +102,22 @@ button{font:inherit;color:inherit}
   background:var(--acento-fraco);color:var(--acento)}
 .selo.off{background:var(--rule-soft);color:var(--muted)}
 
-.quadro{background:var(--surface);border:1px solid var(--rule);border-radius:4px;margin-bottom:14px;
-  box-shadow:var(--sombra);overflow:hidden}
-details.quadro>summary{background:var(--cab-bg);padding:8px 14px;display:flex;align-items:center;gap:10px;
+/* o assunto se separa por fio e por espaço, como num laudo impresso: o
+   quadro não é caixa, é uma seção aberta sobre o papel */
+.quadro{background:transparent;border:none;border-top:2px solid var(--ink);border-radius:0;
+  margin-bottom:26px;box-shadow:none;overflow:visible}
+details.quadro>summary{background:transparent;padding:9px 0 7px;display:flex;align-items:baseline;gap:10px;
   cursor:pointer;list-style:none;border-bottom:1px solid var(--rule)}
 details.quadro>summary::-webkit-details-marker{display:none}
-details.quadro>summary h2{font-family:var(--cond);font-size:var(--t-tit);letter-spacing:.09em;
-  text-transform:uppercase;color:var(--cab-ink)}
+details.quadro>summary h2{font-family:var(--serif);font-size:var(--t-tit);font-weight:600;
+  letter-spacing:0;text-transform:none;color:var(--cab-ink);line-height:1.2}
 details.quadro>summary .obs{font-size:var(--t-nota);color:var(--cab-sub);font-weight:400}
-details.quadro>summary .seta{margin-left:auto;width:8px;height:8px;border-right:1.6px solid var(--cab-sub);
-  border-bottom:1.6px solid var(--cab-sub);transform:rotate(-45deg);transition:transform .15s;flex:none}
+details.quadro>summary .seta{margin-left:auto;align-self:center;width:7px;height:7px;
+  border-right:1.5px solid var(--cab-sub);border-bottom:1.5px solid var(--cab-sub);
+  transform:rotate(-45deg);transition:transform .15s;flex:none}
 details.quadro[open]>summary .seta{transform:rotate(45deg)}
 details.quadro>summary:focus-visible{outline:2px solid var(--acento);outline-offset:-2px}
-.quadro .interior{padding:2px 14px 10px}
+.quadro .interior{padding:4px 0 2px}
 
 /* ---------- registro: rótulo | campo | unidade | nota ---------- */
 .reg{display:grid;grid-template-columns:var(--rot) var(--campo) var(--uni) minmax(0,1fr);
@@ -203,7 +221,7 @@ table.grade tr.forte td{border-top:1px solid var(--rule)}
 .nota-bloco{font-size:var(--t-nota);color:var(--muted);padding:8px 0 2px;line-height:var(--lh)}
 
 /* ---------- tabelas de saída ---------- */
-.rolagem{overflow:auto;max-height:70vh;border:1px solid var(--rule);border-radius:4px;background:var(--surface)}
+.rolagem{overflow:auto;max-height:70vh;border:1px solid var(--rule);border-radius:2px;background:var(--surface)}
 .folha.planilha .rolagem{max-height:calc(100vh - 172px)}
 table.dados{width:100%;border-collapse:separate;border-spacing:0;font-size:var(--t-rot)}
 table.dados th{position:sticky;top:0;background:var(--surface);color:var(--muted);font-weight:500;
@@ -251,18 +269,18 @@ td.ind{padding-left:24px}
 
 /* ---------- indicadores ---------- */
 .painel{display:flex;flex-wrap:wrap;gap:1px;background:var(--rule);border:1px solid var(--rule);
-  border-radius:4px;overflow:hidden}
+  border-radius:2px;overflow:hidden}
 .painel .cel{background:var(--surface);padding:11px 13px;flex:1 1 180px;min-width:168px}
 .painel .k{font-size:var(--t-cab);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .painel .v{font-family:var(--mono);font-size:19px;font-weight:500;margin-top:3px;font-variant-numeric:tabular-nums}
 .painel .n{font-size:var(--t-nota);color:var(--muted);margin-top:1px}
 .destaque-gleba{background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--acento);
-  border-radius:4px;padding:16px 18px;margin-bottom:14px;display:flex;gap:26px;align-items:flex-end;flex-wrap:wrap}
+  border-radius:2px;padding:16px 18px;margin-bottom:14px;display:flex;gap:26px;align-items:flex-end;flex-wrap:wrap}
 .destaque-gleba .k{font-size:var(--t-cab);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .destaque-gleba .v{font-family:var(--mono);font-size:38px;font-weight:500;line-height:1.05;
   letter-spacing:-.01em;color:var(--acento)}
 .destaque-gleba .n{font-size:var(--t-nota);color:var(--muted);margin-top:3px;max-width:64ch}
-.acao-clara{background:var(--acento-fraco);border:1px solid var(--campo-borda);border-radius:4px;
+.acao-clara{background:var(--acento-fraco);border:1px solid var(--campo-borda);border-radius:2px;
   padding:7px 13px;font-size:var(--t-rot);color:var(--acento);cursor:pointer}
 .acao-clara:hover{border-color:var(--acento)}
 .acao-clara:disabled{opacity:.6;cursor:default}
@@ -273,18 +291,18 @@ td.ind{padding-left:24px}
 .chip.ruim{border-color:var(--neg);color:var(--neg)}
 .chip.ruim .pt{background:var(--neg)}
 .alerta{background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--warn);
-  border-radius:4px;padding:10px 14px;font-size:var(--t-rot);line-height:var(--lh);margin-bottom:14px;
+  border-radius:2px;padding:10px 14px;font-size:var(--t-rot);line-height:var(--lh);margin-bottom:14px;
   display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .alerta>span{flex:1 1 380px}
 .alerta.ruim{border-left-color:var(--neg)}
 .alerta.oculto{display:none}
 .aviso-flutuante{position:fixed;right:18px;bottom:18px;z-index:60;max-width:380px;background:var(--surface);
-  border:1px solid var(--warn);border-left:3px solid var(--warn);border-radius:4px;padding:11px 14px;
-  font-size:var(--t-rot);line-height:var(--lh);color:var(--ink);box-shadow:0 8px 24px rgba(0,0,0,.4)}
+  border:1px solid var(--warn);border-left:3px solid var(--warn);border-radius:2px;padding:11px 14px;
+  font-size:var(--t-rot);line-height:var(--lh);color:var(--ink);box-shadow:var(--flutua)}
 .aviso-flutuante b{display:block;font-size:var(--t-cab);letter-spacing:.08em;text-transform:uppercase;
   color:var(--warn);margin-bottom:3px}
-.memo h3{font-family:var(--cond);font-size:var(--t-tit);letter-spacing:.05em;text-transform:uppercase;
-  color:var(--acento);margin:18px 0 6px}
+.memo h3{font-family:var(--serif);font-size:var(--t-tit);font-weight:600;letter-spacing:0;
+  text-transform:none;color:var(--ink);margin:22px 0 6px}
 .memo p{margin:0 0 9px;max-width:104ch;font-size:var(--t-rot);color:var(--ink2);line-height:1.65}
 .memo .num{font-family:var(--mono);color:var(--ink);font-weight:500}
 </style>
