@@ -139,8 +139,10 @@ function coerencia(r, etiqueta) {
     i.equivalenteVista, i.vpPermuta + i.vpSinal + i.vpParcelas, { abs: 1 });
   conferir(etiqueta + ' · sinal entra no mês 0, sem desconto', i.vpSinal, i.sinalTerreno, { abs: 1 });
   conferir(etiqueta + ' · sinal não passa do dinheiro do negócio', i.sinalTerreno <= i.caixaTerreno + 1, true);
-  conferir(etiqueta + ' · valor da gleba = dinheiro + permuta nominal', i.valorTerreno,
-    i.caixaTerreno + i.permutaNominal, { abs: 1 });
+  conferir(etiqueta + ' · valor da gleba = dinheiro + permuta, em moeda da base', i.valorTerreno,
+    i.caixaBase + i.permutaBase, { abs: 1 });
+  conferir(etiqueta + ' · o dinheiro em moeda da base não passa do contratado',
+    i.caixaBase <= i.caixaTerreno + 1, true);
   conferir(etiqueta + ' · nominal não é menor que o presente', i.valorTerreno >= i.equivalenteVista - 1, true);
   conferir(etiqueta + ' · ITBI = 2% do equivalente à vista', -T.itbi,
     0.02 * i.equivalenteVista * Math.pow(1.035, -1 / 12), { rel: 0.001 });

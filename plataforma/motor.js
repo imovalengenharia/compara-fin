@@ -596,8 +596,12 @@
       M.vpParcelas = Math.max(0, M.vpCaixa - M.vpSinal);
       /* duas medidas do mesmo negócio: o que o terrenista recebe ao longo do
          tempo, em moeda da base, e o que isso vale hoje à taxa dele */
-      M.permutaNominal = M.col.permuta.reduce(function (a, x) { return a + Math.abs(x); }, 0);
-      M.valorTerreno = caixa + M.permutaNominal;
+      /* As duas pernas na mesma moeda: o fluxo inteiro corre em moeda da
+         data-base, e o terreno não tem por que ser diferente. Somar o caixa
+         contratado com a permuta já deflacionada misturava duas réguas. */
+      M.permutaBase = M.col.permuta.reduce(function (a, x) { return a + Math.abs(x); }, 0);
+      M.caixaBase = M.col.terreno.reduce(function (a, x) { return a + Math.abs(x); }, 0);
+      M.valorTerreno = M.caixaBase + M.permutaBase;
       M.equivalenteVista = M.vpCaixa + vp;
       return M;
     }
@@ -792,7 +796,7 @@
         precoMedioM2: prog.alv > 0 ? prog.vgv / prog.alv : 0,
         permutaPct: permPct, vpPermuta: M.vpPermuta, taxaTerrenista: taxaTerrenista,
         valorTerreno: M.valorTerreno, equivalenteVista: M.equivalenteVista,
-        permutaNominal: M.permutaNominal,
+        permutaBase: M.permutaBase, caixaBase: M.caixaBase,
         caixaTerreno: M.caixaTerreno, vpCaixa: M.vpCaixa,
         vpSinal: M.vpSinal, vpParcelas: M.vpParcelas,
         formaTerreno: T.forma, modoTerreno: T.modo,

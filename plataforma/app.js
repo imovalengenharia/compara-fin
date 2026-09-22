@@ -1009,7 +1009,7 @@
         e('div', {}, [
           e('div', { cls: 'k', txt: i.modoTerreno === 'resolver' ? 'Teto de aquisição da gleba' : 'Valor da gleba informado' }),
           e('div', { cls: 'v', txt: R$(i.valorTerreno) }),
-          e('div', { cls: 'n', txt: 'nominal, somando dinheiro e permuta' +
+          e('div', { cls: 'n', txt: 'em moeda da data-base, somando dinheiro e permuta' +
             (i.modoTerreno === 'resolver' ? ' · TIR travada na TMA de ' + pc(i.tma) : ' · valor informado') })
         ]),
         e('div', {}, [e('div', { cls: 'k', txt: 'Equivalente à vista' }),
@@ -1074,21 +1074,21 @@
          lado do valor presente. O nominal é o que o terrenista recebe; o
          valor presente é o que esse recebimento vale hoje, à taxa dele. */
       var meios = [];
-      var emParcelas = Math.max(0, i.caixaTerreno - i.sinalTerreno);
+      var emParcelas = Math.max(0, i.caixaBase - i.sinalTerreno);
       if (i.sinalTerreno > 0.5) meios.push(['Sinal, em dinheiro', 'na assinatura, no mês 0',
         i.sinalTerreno, i.vpSinal]);
       if (emParcelas > 0.5) meios.push(['Parcelas em dinheiro',
         i.parcelasTerreno + (i.parcelasTerreno > 1 ? ' parcelas iguais' : ' parcela') +
         ' a partir do mês ' + i.mesTerreno, emParcelas, i.vpParcelas]);
-      if (i.permutaNominal > 0.5) meios.push(['Permuta financeira',
-        pc(i.permutaPct) + ' da receita líquida mensal', i.permutaNominal, i.vpPermuta]);
+      if (i.permutaBase > 0.5) meios.push(['Permuta financeira',
+        pc(i.permutaPct) + ' da receita líquida mensal', i.permutaBase, i.vpPermuta]);
 
       /* a condição anda colada ao meio de pagamento: é o mesmo assunto */
       function meio(rot, cond) {
         return e('td', {}, [e('span', { txt: rot }),
           cond ? e('span', { cls: 'cond', txt: ' · ' + cond }) : null]);
       }
-      var thP = e('tr', {}, ['Meio de pagamento', 'Nominal (R$)', 'Valor presente (R$)', '% do negócio']
+      var thP = e('tr', {}, ['Meio de pagamento', 'Moeda da base (R$)', 'Valor presente (R$)', '% do negócio']
         .map(function (t) { return e('th', { txt: t }); }));
       var tbP = e('tbody');
       meios.forEach(function (m) {
@@ -1105,13 +1105,14 @@
 
       tabelaTerreno.appendChild(e('table', { cls: 'dados' }, [e('thead', {}, [thP]), tbP]));
       notaTerreno.textContent =
-        'O nominal é a soma do que o terrenista recebe, em moeda da data-base. O valor presente ' +
+        'A primeira coluna é a soma do que o terrenista recebe, na moeda da data-base do estudo — ' +
+        'a mesma do fluxo e do demonstrativo. O valor presente ' +
         'desconta cada recebimento pela taxa real do terrenista, ' + pc(i.taxaTerrenista) + ' a.a.' +
         (i.vpSinal > 0.5 ? ' — o sinal está no mês 0 e não desconta.' : '') + ' ' +
         (i.caixaTerreno > 0.5
           ? 'Hoje ' + pc(i.pctDinheiroEfetivo) + ' do negócio está em dinheiro, e o resto em permuta. '
           : 'O negócio inteiro está em permuta. ') +
-        'Adiar o pagamento aumenta o nominal que cabe no estudo, sem mudar o que ele vale hoje.';
+        'Adiar o pagamento aumenta o total que cabe no estudo, sem mudar o que ele vale hoje.';
 
       boxFim.appendChild(e('div', {}, [
         quadro('Demonstrativo de resultados', 'valores deflacionados pelo IPCA',
