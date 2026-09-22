@@ -313,6 +313,23 @@ conferir('4 fases: soma das fases = resultado',
   soma(quatro.resultadoFase.map(function (f) { return f.resultado; })), quatro.ind.resultado, { abs: 1 });
 conferir('4 fases: VPL zerado', quatro.ind.vpl, 0, { abs: 500 });
 conferir('4 fases: ciclo dentro do horizonte', quatro.ind.ultimoRecebimento < 420, true);
+/* o fluxo de receitas de cada fase: a matriz de safras tem de fechar com a
+   receita da fase, e as quatro fases com a receita do estudo */
+quatro.receitaFase.forEach(function (d, k) {
+  var porSafra = 0;
+  d.safras.forEach(function (sf) { sf.serie.forEach(function (v) { porSafra += v; }); });
+  conferir('4 fases: safras da fase ' + d.fase + ' somam a receita dela',
+           porSafra, d.totais.receita, { abs: 1 });
+  conferir('4 fases: receita da fase ' + d.fase + ' bate com o resultado por fase',
+           d.totais.receita, quatro.resultadoFase[k].receita, { abs: 1 });
+  conferir('4 fases: a fase ' + d.fase + ' tem safra em cada janela de venda',
+           [0, 1, 2].every(function (j) {
+             return d.safras.some(function (sf) { return sf.janela === j; });
+           }), true);
+});
+conferir('4 fases: as receitas das fases somam a receita do estudo',
+  soma(quatro.receitaFase.map(function (d) { return d.totais.receita; })),
+  quatro.totais.receita, { abs: 1 });
 var semReceita = Motor.calcular(ITU(function (P) { P.produtos.forEach(function (c) { c.precoM2 = 0; }); }));
 conferir('sem receita: não quebra e o teto é zero', semReceita.ind.valorTerreno <= 1, true);
 

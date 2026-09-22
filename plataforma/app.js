@@ -800,7 +800,12 @@
     atualizadores.push(function (r) {
       caixaSafras.textContent = '';
       var d = r.receitaFase[fi];
-      if (!d || !d.safras.length) return;
+      if (!d || !d.safras.length) {
+        caixaVendas.appendChild(e('p', { cls: 'nota-bloco', txt:
+          'Esta fase ainda não tem lotes: distribua-os no quadro de fases, nas premissas, ' +
+          'e o fluxo de recebimentos desta fase aparece aqui.' }));
+        return;
+      }
       var sf = d.safras, m0 = d.meses[0].mes, m1 = d.meses[d.meses.length - 1].mes;
 
       var grupos = e('tr', { cls: 'grupos' }, [e('th', { colspan: 4, txt: '' })]);
