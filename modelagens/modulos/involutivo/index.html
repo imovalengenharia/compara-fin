@@ -1,0 +1,358 @@
+<meta charset="utf-8">
+<title>Involutivo de Glebas</title>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;450;500;600&family=IBM+Plex+Serif:wght@500;600&display=swap">
+<style>
+/* ============================================================================
+   O estudo é um laudo, não um terminal: papel é o padrão, tinta é grafite e a
+   única cor forte — verde-nanquim — fica reservada ao que o avaliador decide.
+   O tema escuro é escolha, em [data-tema="escuro"]; sem escolha salva, quem
+   decide é o sistema operacional.
+   Três medidas governam todo o alinhamento: --rot, --campo e --gap.
+   ========================================================================== */
+:root{
+  --ground:#EDEBE4; --surface:#FAF9F5; --elev:#F2F0E9; --rule:#D2D0C6; --rule-soft:#E3E1D8;
+  --ink:#1C2226; --ink2:#4B555C; --muted:#7B848A;
+  --acento:#2C5A4C; --acento-forte:#1E4034; --acento-fraco:#DEE6E1; --acento-ink:#F2F0E9;
+  --link:#2C5A4C;
+  --barra-bg:#1C2226; --barra-ink:#F2F0E9; --barra-sub:#9AA2A1;
+  --cab-ink:#1C2226; --cab-sub:#7B848A;
+  --campo-bg:#FFFFFF; --campo-borda:#C9C7BC; --campo-foco:#2C5A4C;
+  --pos:#2C5A4C; --neg:#8C3A1E; --warn:#8A6A14; --aviso-bg:#F6F0DD;
+  --flutua:0 6px 22px rgba(28,34,38,.20);
+  --rot:296px; --campo:132px; --uni:32px; --gap:24px; --dentro:8px;
+  /* uma altura de linha e seis tamanhos de letra governam a plataforma
+     inteira — só o fluxo de caixa, por ser denso, tem escala própria */
+  --linha:34px; --alt:28px; --lh:1.45; --sufixo:21px; --prefixo:25px;
+  --t-tit:15px; --t-rot:12.5px; --t-val:12.5px;
+  --t-uni:11.5px; --t-nota:11.5px; --t-cab:10.5px;
+  --sans:'IBM Plex Sans',system-ui,sans-serif;
+  --serif:'IBM Plex Serif',Georgia,'Times New Roman',serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  color-scheme:light;
+}
+/* o escuro é o mesmo estudo à noite: grafite no lugar do papel, e o verde
+   clareia o bastante para seguir legível sobre ele */
+@media (prefers-color-scheme:dark){
+  :root:not([data-tema="claro"]){
+    --ground:#14171A; --surface:#1A1E21; --elev:#20252A; --rule:#2C3238; --rule-soft:#22272C;
+    --ink:#E7E6E1; --ink2:#AEB3B4; --muted:#7C8488;
+    --acento:#7FAE99; --acento-forte:#9CC6B2; --acento-fraco:#22312C; --acento-ink:#14171A;
+    --link:#7FAE99;
+    --barra-bg:#0E1113; --barra-ink:#EDECE7; --barra-sub:#8D9497;
+    --cab-ink:#E7E6E1; --cab-sub:#7C8488;
+    --campo-bg:#1E2327; --campo-borda:#333A40; --campo-foco:#7FAE99;
+    --pos:#7FAE99; --neg:#D08A6A; --warn:#C9A961; --aviso-bg:#2A2214;
+    --flutua:0 6px 22px rgba(0,0,0,.45);
+    color-scheme:dark;
+  }
+}
+:root[data-tema="escuro"]{
+  --ground:#14171A; --surface:#1A1E21; --elev:#20252A; --rule:#2C3238; --rule-soft:#22272C;
+  --ink:#E7E6E1; --ink2:#AEB3B4; --muted:#7C8488;
+  --acento:#7FAE99; --acento-forte:#9CC6B2; --acento-fraco:#22312C; --acento-ink:#14171A;
+  --link:#7FAE99;
+  --barra-bg:#0E1113; --barra-ink:#EDECE7; --barra-sub:#8D9497;
+  --cab-ink:#E7E6E1; --cab-sub:#7C8488;
+  --campo-bg:#1E2327; --campo-borda:#333A40; --campo-foco:#7FAE99;
+  --pos:#7FAE99; --neg:#D08A6A; --warn:#C9A961; --aviso-bg:#2A2214;
+  --flutua:0 6px 22px rgba(0,0,0,.45);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:var(--t-rot);line-height:var(--lh)}
+h1,h2,h3{margin:0;font-weight:600}
+button{font:inherit;color:inherit}
+
+/* ---------- barra superior ---------- */
+.barra{position:sticky;top:env(safe-area-inset-top,0px);z-index:30;background:var(--barra-bg);
+  color:var(--barra-ink);display:flex;align-items:center;gap:14px;padding:10px 20px;flex-wrap:wrap;
+  border-bottom:1px solid var(--rule)}
+.barra .vazio{flex:1}
+.resumo-topo{display:flex;gap:22px;align-items:baseline}
+.resumo-topo div{display:flex;flex-direction:column}
+.resumo-topo .r{font-size:var(--t-cab);letter-spacing:.11em;color:var(--barra-sub);text-transform:uppercase}
+.resumo-topo .v{font-family:var(--mono);font-size:15px;font-weight:500;color:var(--barra-ink)}
+.acao{background:transparent;border:1px solid rgba(242,240,233,.28);border-radius:3px;padding:6px 11px;
+  font-size:var(--t-nota);cursor:pointer;color:var(--barra-ink);height:var(--alt)}
+.acao:hover{border-color:var(--acento);color:var(--acento)}
+.acao.destaque{background:var(--acento);border-color:var(--acento);color:var(--acento-ink);font-weight:500}
+.acao.destaque:hover{background:var(--acento-forte);border-color:var(--acento-forte)}
+
+/* ---------- abas ---------- */
+.abas{position:sticky;top:calc(env(safe-area-inset-top,0px) + 45px);z-index:29;background:var(--surface);
+  border-bottom:1px solid var(--rule);display:flex;overflow-x:auto;overflow-y:hidden;padding:0 12px 1px;
+  scrollbar-width:none;-ms-overflow-style:none}
+.abas::-webkit-scrollbar{display:none}
+.aba{border:none;background:none;padding:10px 15px;font-size:var(--t-rot);color:var(--muted);cursor:pointer;
+  white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px}
+.aba:hover{color:var(--ink)}
+.aba[aria-selected="true"]{color:var(--acento);border-bottom-color:var(--acento);font-weight:600}
+.aba:focus-visible{outline:2px solid var(--acento);outline-offset:-2px}
+
+/* ---------- folha ---------- */
+.folha{padding:18px 20px 60px;max-width:1680px;margin:0 auto}
+/* o fluxo de caixa é uma planilha: ocupa a página inteira, sem margem de
+   leitura e sem rolagem dupla — a janela do quadro é que rola */
+.folha.planilha{max-width:none;padding:12px 12px 10px}
+.folha-topo{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.folha-topo:empty{display:none}
+.selo{font-size:var(--t-cab);letter-spacing:.1em;text-transform:uppercase;padding:2px 7px;border-radius:3px;
+  background:var(--acento-fraco);color:var(--acento)}
+.selo.off{background:var(--rule-soft);color:var(--muted)}
+
+/* o assunto se separa por fio e por espaço, como num laudo impresso: o
+   quadro não é caixa, é uma seção aberta sobre o papel */
+.quadro{background:transparent;border:none;border-top:2px solid var(--ink);border-radius:0;
+  margin-bottom:26px;box-shadow:none;overflow:visible}
+details.quadro>summary{background:transparent;padding:9px 0 7px;display:flex;align-items:baseline;gap:10px;
+  cursor:pointer;list-style:none;border-bottom:1px solid var(--rule)}
+details.quadro>summary::-webkit-details-marker{display:none}
+details.quadro>summary h2{font-family:var(--serif);font-size:var(--t-tit);font-weight:600;
+  letter-spacing:0;text-transform:none;color:var(--cab-ink);line-height:1.2}
+details.quadro>summary .obs{font-size:var(--t-nota);color:var(--cab-sub);font-weight:400}
+details.quadro>summary .seta{margin-left:auto;align-self:center;width:7px;height:7px;
+  border-right:1.5px solid var(--cab-sub);border-bottom:1.5px solid var(--cab-sub);
+  transform:rotate(-45deg);transition:transform .15s;flex:none}
+details.quadro[open]>summary .seta{transform:rotate(45deg)}
+details.quadro>summary:focus-visible{outline:2px solid var(--acento);outline-offset:-2px}
+.quadro .interior{padding:4px 0 2px}
+
+/* ---------- registro: rótulo | campo | unidade | nota ---------- */
+.reg{display:grid;grid-template-columns:var(--rot) var(--campo) var(--uni) minmax(0,1fr);
+  gap:0 var(--gap);align-items:center;min-height:var(--linha);padding:3px 0;
+  border-bottom:1px solid var(--rule-soft)}
+.reg:last-child{border-bottom:none}
+.reg>.rot{font-size:var(--t-rot);color:var(--ink2);line-height:var(--lh)}
+.reg>.rot.sub{padding-left:16px}
+.reg>.val{display:flex;justify-content:flex-end;align-items:center}
+.reg>.val>*{width:100%}
+.reg>.uni{font-size:var(--t-uni);color:var(--muted);white-space:nowrap}
+.reg>.nota{font-size:var(--t-nota);color:var(--muted);line-height:var(--lh)}
+/* o complemento abre a nota: número em monoespaçada, explicação em seguida */
+.reg>.nota>.comp{padding:0;font-family:var(--mono);font-size:var(--t-nota);color:var(--ink2);
+  text-align:left;font-variant-numeric:tabular-nums;white-space:nowrap}
+.reg>.nota>.comp+span:not(:empty)::before{content:' · '}
+/* complemento sem valor não abre a nota nem deixa o separador solto */
+.reg>.nota>.comp.nulo{display:none}
+.reg>.nota>.comp.nulo+span::before{content:none}
+.reg>.livre{grid-column:2/4;display:flex;justify-content:flex-end;align-items:center;gap:7px}
+.reg>.livre>*{width:auto}
+@media (max-width:1560px){
+  :root{--rot:264px;--gap:18px}
+}
+@media (max-width:1100px){
+  :root{--rot:200px;--campo:118px;--gap:12px}
+  .reg{grid-template-columns:minmax(0,1fr) var(--campo) 30px;gap:0 8px}
+  .reg>.nota{grid-column:1/-1;padding-bottom:4px}
+  .reg>.livre{grid-column:1/-1;justify-content:flex-start}
+}
+
+/* ---------- campos e valores: mesmo tamanho, mesmo recuo interno ---------- */
+input,select{font:inherit;font-family:var(--mono);font-size:var(--t-val);background:var(--campo-bg);
+  border:1px solid var(--campo-borda);border-radius:3px;padding:4px var(--dentro);text-align:right;
+  color:var(--ink);width:var(--campo);max-width:100%;min-width:0;height:var(--alt);line-height:1.2}
+/* o conteúdo encosta sempre na mesma borda; quem tem unidade à direita abre
+   a folga para ela, e só nesse caso os dígitos recuam. R$ vai do lado
+   esquerdo, onde não disputa espaço com o número. */
+input.num{padding-right:var(--dentro)}
+input.num.com-sufixo{padding-right:calc(var(--dentro) + var(--sufixo))}
+input.num.com-prefixo{padding-left:calc(var(--dentro) + var(--prefixo))}
+.campo{position:relative;display:inline-block;width:var(--campo);max-width:100%;vertical-align:middle}
+.campo>input{width:100%}
+.campo>.sufixo,.campo>.prefixo{position:absolute;top:0;height:var(--alt);display:flex;
+  align-items:center;font-family:var(--mono);font-size:var(--t-val);color:var(--muted);
+  pointer-events:none}
+.campo>.sufixo{right:calc(var(--dentro) + 1px)}
+.campo>.prefixo{left:var(--dentro)}
+.campo>input:disabled~.sufixo,.campo>input:disabled~.prefixo{opacity:.7}
+select{font-family:var(--sans);text-align:left}
+input[type=text]{font-family:var(--sans);text-align:left}
+input.num{font-family:var(--mono);text-align:right}
+input.limitado{border-color:var(--warn);background:var(--aviso-bg)}
+.reg>.val>input,.reg>.val>select,.reg>.val>.campo{width:100%}
+input:focus,select:focus{outline:2px solid var(--campo-foco);outline-offset:-1px}
+input:disabled{background:transparent;border-color:var(--rule-soft);color:var(--muted);
+  opacity:.7;cursor:default}
+/* número sugerido: está lá e entra na conta, mas ainda é sugestão da
+   plataforma, não dado do avaliador — por isso a letra mais clara */
+input.sugerido{color:var(--muted)}
+.un{font-size:var(--t-uni);color:var(--muted);white-space:nowrap}
+/* o recuo faz os dígitos calculados caírem na mesma coluna dos digitados */
+.calc{font-family:var(--mono);font-size:var(--t-val);text-align:right;color:var(--ink);
+  padding-right:calc(var(--dentro) + 1px);font-variant-numeric:tabular-nums}
+.calc.com-suf{padding-right:calc(var(--dentro) + var(--sufixo) + 1px)}
+.reg>.val>.calc{display:block;width:100%}
+.calc.txt{padding-right:calc(var(--dentro) + 1px)}
+/* moeda e unidade do valor calculado ocupam as mesmas posições que ocupam
+   dentro de um campo digitável — daí os dígitos alinharem entre os dois */
+.calc>.pre:empty,.calc>.suf:empty{display:none}
+.calc>.pre{margin-right:4px}
+.calc>.suf{margin-left:4px;color:var(--muted)}
+.reg>.val>.calc,table.grade td>.calc{position:relative}
+.reg>.val>.calc>.pre,table.grade td>.calc>.pre,
+.reg>.val>.calc>.suf,table.grade td>.calc>.suf{position:absolute;top:0;height:100%;margin:0;
+  display:flex;align-items:center}
+.reg>.val>.calc>.pre,table.grade td>.calc>.pre{left:var(--dentro);color:var(--muted)}
+.reg>.val>.calc>.suf,table.grade td>.calc>.suf{right:calc(var(--dentro) + 1px)}
+/* a folga à esquerda cobre a moeda com um respiro; mais do que isso e um
+   valor de oito dígitos não caberia entre ela e a folga do sufixo */
+.reg>.val>.calc.com-pre,table.grade td>.calc.com-pre{padding-left:calc(var(--dentro) + 17px)}
+.calc.fraco{color:var(--muted)}
+
+/* ---------- grades: herdam a mesma grade dos registros ---------- */
+table.grade{width:100%;table-layout:fixed;border-collapse:collapse;font-size:var(--t-rot)}
+table.grade th,table.grade td{width:calc(var(--campo) + var(--gap));padding:3px 0 3px var(--gap);
+  height:var(--linha);text-align:right;vertical-align:middle}
+table.grade th:first-child,table.grade td:first-child{width:var(--rot);padding-left:0;text-align:left}
+table.grade th:last-child,table.grade td:last-child{width:auto;padding:0}
+table.grade th{font-weight:500;font-size:var(--t-cab);letter-spacing:.07em;text-transform:uppercase;
+  color:var(--muted);padding-right:calc(var(--dentro) + 1px);
+  border-bottom:1px solid var(--rule)}
+table.grade th:first-child,table.grade th:last-child{padding-right:0}
+table.grade td{border-bottom:1px solid var(--rule-soft)}
+table.grade td:first-child{color:var(--ink2)}
+table.grade td>input,table.grade td>select,table.grade td>.calc,table.grade td>.campo{
+  width:var(--campo);display:inline-block;text-align:right;vertical-align:middle}
+table.grade tr.forte td{border-top:1px solid var(--rule)}
+.nota-linha{font-size:var(--t-nota);color:var(--muted);line-height:var(--lh)}
+/* a nota corre até o fim do quadro: quebrar antes deixa um vazio à direita */
+.nota-bloco{font-size:var(--t-nota);color:var(--muted);padding:8px 0 2px;line-height:var(--lh)}
+
+/* ---------- tabelas de saída ---------- */
+.rolagem{overflow:auto;max-height:70vh;border:1px solid var(--rule);border-radius:2px;background:var(--surface)}
+.folha.planilha .rolagem{max-height:calc(100vh - 172px)}
+table.dados{width:100%;border-collapse:separate;border-spacing:0;font-size:var(--t-rot)}
+table.dados th{position:sticky;top:0;background:var(--surface);color:var(--muted);font-weight:500;
+  text-align:right;padding:7px 9px;border-bottom:1px solid var(--rule);white-space:nowrap;z-index:2;
+  font-size:var(--t-cab);letter-spacing:.05em;text-transform:uppercase}
+table.dados th:first-child,table.dados td:first-child{text-align:left;position:sticky;left:0;
+  background:var(--surface);z-index:1}
+table.dados th:first-child{z-index:3}
+table.dados td{text-align:right;padding:3px 9px;border-bottom:1px solid var(--rule-soft);
+  font-family:var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+table.dados td:first-child{font-family:var(--sans);color:var(--ink2)}
+table.dados td .cond{color:var(--muted)}
+.divisa{border-top:1px solid var(--rule);margin:14px 0 12px}
+table.dados tr.total td{border-bottom:1px solid var(--rule);border-top:1px solid var(--rule)}
+table.dados.compacto{font-size:9.5px}
+table.dados.compacto th{font-size:9px;padding:6px 11px;letter-spacing:.02em;white-space:normal;
+  text-transform:none;line-height:1.3;vertical-align:bottom;width:84px;min-width:72px}
+table.dados.compacto th:first-child{width:48px;min-width:48px;padding-left:12px}
+table.dados.compacto td{padding:2px 11px;line-height:1.6}
+
+/* ---------- chaves de desembolso, acima da coluna que governam ---------- */
+table.dados.compacto thead tr.chaves-linha th{top:0;height:64px;vertical-align:bottom;
+  padding:4px 7px 5px;background:var(--rule-soft);border-bottom:none;text-transform:none;
+  letter-spacing:0;font-size:9px;color:var(--muted)}
+table.dados.compacto thead tr.chaves-linha th:first-child{text-align:left;padding-left:12px;
+  font-size:8.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--acento);
+  vertical-align:bottom}
+table.dados.compacto thead tr.rotulos th{top:64px}
+/* todo campo da faixa tem a mesma largura e a mesma borda direita: com ou
+   sem sufixo, mês ou percentual, os campos de uma coluna ficam simétricos */
+.chaves{display:flex;flex-direction:column;gap:2px;align-items:flex-end;--chave:46px}
+.chave{display:flex;align-items:center;gap:5px;justify-content:flex-end;white-space:nowrap;cursor:text}
+.chave>.k{font-size:8.5px;color:var(--muted);line-height:1}
+.chave input,.chave .campo{width:var(--chave);min-width:var(--chave)}
+.chave input{height:17px;padding:0 4px;font-size:9.5px;border-radius:2px;line-height:1}
+.chave .campo>input{width:100%;min-width:0}
+.chave input.num.com-sufixo{padding-right:13px}
+.chave .campo>.sufixo{height:17px;right:3px;font-size:9px}
+table.dados.compacto td:first-child{padding-left:12px}
+/* a matriz de safras: o grupo da janela abre o cabeçalho, e a coluna do mês
+   e a do recebido ficam presas à esquerda enquanto as safras rolam */
+table.dados.safras thead tr.grupos th{top:0;text-align:center;letter-spacing:.06em;
+  background:var(--rule-soft);color:var(--acento);border-bottom:1px solid var(--rule)}
+table.dados.safras thead tr.grupos th:first-child{background:var(--rule-soft)}
+table.dados.safras thead tr:last-child th{top:27px}
+table.dados.safras th:nth-child(2),table.dados.safras td:nth-child(2){position:sticky;left:48px;
+  background:var(--surface);z-index:1}
+table.dados.safras th:nth-child(4),table.dados.safras td:nth-child(4){border-right:1px solid var(--rule)}
+table.dados.safras thead tr:last-child th:nth-child(2){z-index:3}
+table.dados.safras tbody tr.soma td{border-bottom:1px solid var(--rule)}
+table.dados tr:hover td{background:var(--rule-soft)}
+.neg{color:var(--neg)}
+tr.soma td{border-top:1px solid var(--rule)}
+tr.soma td:first-child{color:var(--ink2)}
+td.ind{padding-left:24px}
+
+/* ---------- indicadores ---------- */
+.painel{display:flex;flex-wrap:wrap;gap:1px;background:var(--rule);border:1px solid var(--rule);
+  border-radius:2px;overflow:hidden}
+.painel .cel{background:var(--surface);padding:11px 13px;flex:1 1 180px;min-width:168px}
+.painel .k{font-size:var(--t-cab);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.painel .v{font-family:var(--mono);font-size:19px;font-weight:500;margin-top:3px;font-variant-numeric:tabular-nums}
+.painel .n{font-size:var(--t-nota);color:var(--muted);margin-top:1px}
+.destaque-gleba{background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--acento);
+  border-radius:2px;padding:16px 18px;margin-bottom:14px;display:flex;gap:26px;align-items:flex-end;flex-wrap:wrap}
+.destaque-gleba .k{font-size:var(--t-cab);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.destaque-gleba .v{font-family:var(--mono);font-size:38px;font-weight:500;line-height:1.05;
+  letter-spacing:-.01em;color:var(--acento)}
+.destaque-gleba .n{font-size:var(--t-nota);color:var(--muted);margin-top:3px;max-width:64ch}
+.acao-clara{background:var(--acento-fraco);border:1px solid var(--campo-borda);border-radius:2px;
+  padding:7px 13px;font-size:var(--t-rot);color:var(--acento);cursor:pointer}
+.acao-clara:hover{border-color:var(--acento)}
+.acao-clara:disabled{opacity:.6;cursor:default}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:var(--t-nota);color:var(--ink2);
+  border:1px solid var(--rule);border-radius:3px;padding:4px 9px;background:var(--surface)}
+.chip .pt{width:6px;height:6px;border-radius:50%;background:var(--pos)}
+.chip.ruim{border-color:var(--neg);color:var(--neg)}
+.chip.ruim .pt{background:var(--neg)}
+.alerta{background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--warn);
+  border-radius:2px;padding:10px 14px;font-size:var(--t-rot);line-height:var(--lh);margin-bottom:14px;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.alerta>span{flex:1 1 380px}
+.alerta.ruim{border-left-color:var(--neg)}
+.alerta.oculto{display:none}
+.aviso-flutuante{position:fixed;right:18px;bottom:18px;z-index:60;max-width:380px;background:var(--surface);
+  border:1px solid var(--warn);border-left:3px solid var(--warn);border-radius:2px;padding:11px 14px;
+  font-size:var(--t-rot);line-height:var(--lh);color:var(--ink);box-shadow:var(--flutua)}
+.aviso-flutuante b{display:block;font-size:var(--t-cab);letter-spacing:.08em;text-transform:uppercase;
+  color:var(--warn);margin-bottom:3px}
+/* ---------- curva do caixa: uma série, uma cor, o zero como eixo ---------- */
+.curva-caixa{position:relative;margin:6px 0 2px}
+svg.curva{display:block;width:100%;height:auto}
+svg.curva .grade{stroke:var(--rule-soft);stroke-width:1}
+svg.curva .zero{stroke:var(--rule);stroke-width:1}
+svg.curva .lamina{fill:var(--acento);opacity:.10}
+svg.curva .linha{fill:none;stroke:var(--acento);stroke-width:2;stroke-linejoin:round;stroke-linecap:round}
+svg.curva .ponto{fill:var(--acento);stroke:var(--surface);stroke-width:2}
+svg.curva .bola{fill:var(--acento);stroke:var(--surface);stroke-width:2}
+svg.curva .fio{stroke:var(--muted);stroke-width:1}
+svg.curva .marca{font-family:var(--mono);font-size:10px;fill:var(--muted)}
+svg.curva .rotulo{font-family:var(--sans);font-size:11px;fill:var(--ink2)}
+svg.curva .fim{text-anchor:end}
+svg.curva .ini{text-anchor:start}
+svg.curva .meio{text-anchor:middle}
+.curva-caixa .cartao{position:absolute;top:6px;width:190px;pointer-events:none;
+  background:var(--surface);border:1px solid var(--rule);border-radius:2px;padding:7px 9px;
+  box-shadow:var(--flutua);font-size:var(--t-nota);color:var(--ink2)}
+.curva-caixa .cartao .k{font-size:var(--t-cab);letter-spacing:.06em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:3px}
+.curva-caixa .cartao div{display:flex;justify-content:space-between;gap:10px;line-height:1.5}
+.curva-caixa .cartao b{font-family:var(--mono);font-weight:500;color:var(--ink);
+  font-variant-numeric:tabular-nums}
+@media (max-width:700px){ .curva-caixa .cartao{display:none} }
+
+.memo h3{font-family:var(--serif);font-size:var(--t-tit);font-weight:600;letter-spacing:0;
+  text-transform:none;color:var(--ink);margin:22px 0 6px}
+.memo p{margin:0 0 9px;max-width:104ch;font-size:var(--t-rot);color:var(--ink2);line-height:1.65}
+.memo .num{font-family:var(--mono);color:var(--ink);font-weight:500}
+</style>
+
+<header class="barra">
+  <div class="resumo-topo" id="resumo-topo"></div>
+  <span class="vazio"></span>
+  <button class="acao" id="btn-tema" type="button" title="Alternar tema">Tema claro</button>
+  <button class="acao" id="btn-restaurar" type="button">Restaurar padrão</button>
+  <button class="acao" id="btn-json" type="button">Salvar</button>
+  <button class="acao destaque" id="btn-csv" type="button">Exportar fluxo</button>
+</header>
+<nav class="abas" id="abas" role="tablist"></nav>
+<main class="folha" id="folha"></main>
+
+<script src="motor.js"></script>
+<script src="app.js"></script>

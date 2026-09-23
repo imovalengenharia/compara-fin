@@ -1,0 +1,116 @@
+/* ============================================================================
+   A casca veste a mesma roupa do laudo: papel, grafite e verde-nanquim.
+   Toda cor mora num token; o escuro é o mesmo papel à noite e segue o sistema.
+   ========================================================================== */
+:root{
+  --ground:#EDEBE4; --surface:#FAF9F5; --elev:#F2F0E9; --rule:#D2D0C6; --rule-soft:#E3E1D8;
+  --ink:#1C2226; --ink2:#4B555C; --muted:#7B848A;
+  --acento:#2C5A4C; --acento-forte:#1E4034; --acento-fraco:#DEE6E1; --acento-ink:#F2F0E9;
+  --barra-bg:#1C2226; --barra-ink:#F2F0E9; --barra-sub:#9AA2A1;
+  --campo-bg:#FFFFFF; --campo-borda:#C9C7BC; --campo-foco:#2C5A4C;
+  --neg:#8C3A1E; --aviso-bg:#F6F0DD; --erro-bg:#F4E4DC;
+  --alt:34px; --campo:320px;
+  --t-tit:20px; --t-txt:14px; --t-nota:12.5px; --t-cab:10.5px;
+  --sans:'IBM Plex Sans',system-ui,sans-serif;
+  --serif:'IBM Plex Serif',Georgia,'Times New Roman',serif;
+  --mono:'IBM Plex Mono',ui-monospace,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --ground:#14171A; --surface:#1A1E21; --elev:#20252A; --rule:#2C3238; --rule-soft:#22272C;
+    --ink:#E7E6E1; --ink2:#AEB3B4; --muted:#7C8488;
+    --acento:#7FAE99; --acento-forte:#9CC6B2; --acento-fraco:#22312C; --acento-ink:#14171A;
+    --barra-bg:#0E1113; --barra-ink:#EDECE7; --barra-sub:#8D9497;
+    --campo-bg:#1E2327; --campo-borda:#333A40; --campo-foco:#7FAE99;
+    --neg:#D08A6A; --aviso-bg:#2A2214; --erro-bg:#2E1E18;
+    color-scheme:dark;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--ground);color:var(--ink);font-family:var(--sans);font-size:var(--t-txt);line-height:1.5}
+a{color:var(--acento)}
+h1,h2{font-family:var(--serif);font-weight:600;margin:0}
+h1{font-size:var(--t-tit)}
+h2{font-size:15px}
+button,input,select{font:inherit;color:inherit}
+
+/* ---------- barra ---------- */
+.barra{display:flex;align-items:center;gap:16px;padding:0 20px;height:48px;
+  background:var(--barra-bg);color:var(--barra-ink);border-bottom:1px solid var(--rule)}
+.barra .marca{font-family:var(--serif);font-weight:600;font-size:15px;color:var(--barra-ink);text-decoration:none}
+.barra .vazio{flex:1}
+.barra .quem{font-size:var(--t-nota);color:var(--barra-sub)}
+.barra form{margin:0}
+.barra .acao{background:transparent;border:1px solid rgba(242,240,233,.28);border-radius:3px;
+  padding:0 11px;height:28px;font-size:var(--t-nota);cursor:pointer;color:var(--barra-ink)}
+.barra .acao:hover{border-color:var(--acento);color:var(--acento)}
+.barra .trilha{display:flex;gap:6px;align-items:center;font-size:var(--t-nota);color:var(--barra-sub);min-width:0}
+.barra .trilha a{color:var(--barra-sub);text-decoration:none}
+.barra .trilha a:hover{color:var(--barra-ink)}
+.barra .trilha .atual{color:var(--barra-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.barra .estado{font-size:var(--t-nota);color:var(--barra-sub);min-width:9ch;text-align:right}
+.barra .estado.erro{color:#E5A487}
+
+/* ---------- conta: um cartão no meio do papel ---------- */
+.conta{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px}
+.cartao{width:100%;max-width:400px;background:var(--surface);border:1px solid var(--rule);border-radius:4px;padding:32px}
+.cartao .marca{font-family:var(--serif);font-weight:600;font-size:13px;letter-spacing:.08em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:18px}
+.cartao h1{margin-bottom:20px}
+.cartao .rodape{margin-top:20px;font-size:var(--t-nota);color:var(--ink2);display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.cartao p{color:var(--ink2);margin:0 0 14px}
+
+.campo{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
+.campo label{font-size:var(--t-nota);color:var(--ink2)}
+.campo .nota{font-size:var(--t-nota);color:var(--muted)}
+input[type=text],input[type=email],input[type=password],select{height:var(--alt);padding:0 10px;
+  background:var(--campo-bg);border:1px solid var(--campo-borda);border-radius:3px;width:100%}
+input:focus,select:focus{outline:none;border-color:var(--campo-foco);box-shadow:0 0 0 2px var(--acento-fraco)}
+.botao{height:var(--alt);padding:0 16px;border-radius:3px;cursor:pointer;
+  border:1px solid var(--acento);background:var(--acento);color:var(--acento-ink);font-weight:500}
+.botao:hover{background:var(--acento-forte);border-color:var(--acento-forte)}
+.botao.largo{width:100%}
+.botao.leve{background:transparent;color:var(--ink);border-color:var(--campo-borda);font-weight:400}
+.botao.leve:hover{border-color:var(--acento);color:var(--acento)}
+.link-botao{background:none;border:0;padding:0;color:var(--acento);cursor:pointer;font-size:var(--t-nota);text-decoration:underline}
+.link-botao.perigo{color:var(--neg)}
+
+.aviso{padding:10px 12px;border-radius:3px;margin-bottom:16px;font-size:var(--t-nota);
+  background:var(--aviso-bg);color:var(--ink)}
+.aviso.erro{background:var(--erro-bg);color:var(--neg)}
+
+/* ---------- pastas ---------- */
+.pagina{max-width:960px;margin:0 auto;padding:28px 20px 60px}
+.cabeca{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.caminho{font-size:var(--t-nota);color:var(--muted);margin-bottom:4px}
+.caminho a{color:var(--ink2);text-decoration:none}
+.caminho a:hover{color:var(--acento)}
+.quadro{background:var(--surface);border:1px solid var(--rule);border-radius:4px}
+.lista{list-style:none;margin:0;padding:0}
+.lista li{display:flex;align-items:center;gap:14px;padding:10px 16px;border-top:1px solid var(--rule-soft)}
+.lista li:first-child{border-top:0}
+.lista .icone{width:18px;text-align:center;color:var(--muted);font-family:var(--mono)}
+.lista .nome{flex:1;min-width:0}
+.lista .nome a{color:var(--ink);text-decoration:none;font-weight:500}
+.lista .nome a:hover{color:var(--acento)}
+.lista .meta{font-size:var(--t-nota);color:var(--muted);white-space:nowrap}
+.lista details{position:relative}
+.lista summary{list-style:none;cursor:pointer;color:var(--muted);padding:0 6px;font-size:18px;line-height:1}
+.lista summary::-webkit-details-marker{display:none}
+.lista .menu{position:absolute;right:0;top:24px;z-index:5;background:var(--surface);border:1px solid var(--rule);
+  border-radius:4px;box-shadow:0 6px 22px rgba(28,34,38,.18);padding:12px;width:280px;display:flex;flex-direction:column;gap:12px}
+.lista .menu form{display:flex;gap:6px;margin:0}
+.lista .menu form input,.lista .menu form select{flex:1;min-width:0}
+.vazia{padding:28px 16px;color:var(--muted);text-align:center}
+.novos{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:20px}
+.novos .quadro{padding:16px}
+.novos h2{margin-bottom:12px}
+.novos form{display:flex;flex-direction:column;gap:10px}
+@media (max-width:680px){ .novos{grid-template-columns:1fr} }
+
+/* ---------- estudo: a casca é só a barra; o módulo ocupa o resto ---------- */
+body.estudo{height:100vh;display:flex;flex-direction:column;overflow:hidden}
+body.estudo iframe{flex:1;width:100%;border:0;display:block;background:var(--ground)}
+.novos .nota{font-size:var(--t-nota);color:var(--muted)}

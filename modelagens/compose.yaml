@@ -1,0 +1,14 @@
+# Postgres para desenvolvimento:  docker compose up -d
+services:
+  banco:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: modelagens
+      POSTGRES_PASSWORD: modelagens
+      POSTGRES_DB: modelagens
+    ports: ["5432:5432"]
+    volumes:
+      - dados:/var/lib/postgresql/data
+      - ./casca/banco-teste.sql:/docker-entrypoint-initdb.d/banco-teste.sql:ro
+volumes:
+  dados:

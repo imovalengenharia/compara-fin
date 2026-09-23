@@ -1,0 +1,27 @@
+{
+  "name": "modelagens",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env --watch casca/iniciar.js",
+    "start": "node casca/iniciar.js",
+    "migrar": "node --env-file-if-exists=.env casca/migrar.js",
+    "test": "node --env-file-if-exists=.env --test --test-concurrency=1 'testes/*.test.js' && npm run test:involutivo",
+    "test:involutivo": "node modulos/involutivo/testes/auditoria.js > /dev/null && echo 'involutivo: auditoria OK'",
+    "test:navegador": "node --env-file-if-exists=.env --test --test-concurrency=1 'testes/navegador/*.test.js'"
+  },
+  "dependencies": {
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/formbody": "^9.0.0",
+    "@fastify/static": "^10.1.4",
+    "fastify": "^5.12.5",
+    "nodemailer": "^10.0.10",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "playwright": "^1.56.1"
+  }
+}
