@@ -11,12 +11,12 @@ function exigir(nome, padraoDev) {
 export function lerConfig(sobrepor = {}) {
   const c = {
     producao,
-    nome: process.env.PLATAFORMA_NOME || 'Modelagens',
-    urlBanco: exigir('DATABASE_URL', 'postgres://modelagens:modelagens@localhost:5432/modelagens'),
+    nome: process.env.PLATAFORMA_NOME || 'Imovaluation',
+    urlBanco: exigir('DATABASE_URL', 'postgres://imovaluation:imovaluation@localhost:5432/imovaluation'),
     urlPublica: (process.env.URL_PUBLICA || 'http://localhost:3000').replace(/\/$/, ''),
     porta: Number(process.env.PORTA || process.env.PORT || 3000),
     smtp: process.env.SMTP_URL || null,
-    remetente: process.env.EMAIL_REMETENTE || 'Modelagens <nao-responda@localhost>',
+    remetente: process.env.EMAIL_REMETENTE || 'Imovaluation <nao-responda@localhost>',
     sessaoDias: 30,
     recuperacaoMinutos: 60,
     ...sobrepor,

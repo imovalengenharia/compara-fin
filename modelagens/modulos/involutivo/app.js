@@ -1552,7 +1552,7 @@
      premissas inteiras a cada recálculo. Sozinho no navegador, nada disso
      existe e o estudo mora no localStorage, como sempre. */
   var casca = null;
-  var CANAL = 'modelagens';
+  var CANAL = 'imovaluation';
 
   function iniciar() {
     if (!/[?&]casca(&|=|$)/.test(location.search) || window.parent === window) {

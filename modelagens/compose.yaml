@@ -3,9 +3,9 @@ services:
   banco:
     image: postgres:16
     environment:
-      POSTGRES_USER: modelagens
-      POSTGRES_PASSWORD: modelagens
-      POSTGRES_DB: modelagens
+      POSTGRES_USER: imovaluation
+      POSTGRES_PASSWORD: imovaluation
+      POSTGRES_DB: imovaluation
     ports: ["5432:5432"]
     volumes:
       - dados:/var/lib/postgresql/data

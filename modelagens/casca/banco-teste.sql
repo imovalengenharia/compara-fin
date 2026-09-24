@@ -1,1 +1,1 @@
-CREATE DATABASE modelagens_teste OWNER modelagens;
+CREATE DATABASE imovaluation_teste OWNER imovaluation;

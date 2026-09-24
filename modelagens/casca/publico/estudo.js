@@ -3,7 +3,7 @@
    premissas e a casca salva — agrupando as mudanças em rajada numa só gravação. */
 (function () {
   'use strict';
-  var CANAL = 'modelagens', ESPERA = 800;
+  var CANAL = 'imovaluation', ESPERA = 800;
   var quadro = document.getElementById('modulo');
   var estado = document.getElementById('estado');
   var id = quadro.getAttribute('data-estudo');

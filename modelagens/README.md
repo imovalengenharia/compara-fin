@@ -1,9 +1,7 @@
-# Modelagens
+# Imovaluation
 
-Plataforma de modelagens: a casca autentica, cobra e guarda; cada modelagem é um
+Plataforma de modelagens imobiliárias: a casca autentica, cobra e guarda; cada modelagem é um
 aplicativo dentro dela. O **Involutivo de Glebas** é o primeiro.
-
-> Nome provisório — o nome da plataforma vem de `PLATAFORMA_NOME`.
 
 ## Rodar
 

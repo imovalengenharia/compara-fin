@@ -4,10 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## O que é
 
-Uma plataforma de modelagens: a **casca** autentica, cobra e guarda; cada
-**modelagem** é um aplicativo dentro dela. O Involutivo de Glebas é o primeiro.
-A plataforma nasceu do zero — nada de código, modelo de dados ou hábito de
-projeto anterior. O nome é provisório: vem de `PLATAFORMA_NOME`.
+**Imovaluation** é uma plataforma de modelagens: a **casca** autentica, cobra e
+guarda; cada **modelagem** é um aplicativo dentro dela. O Involutivo de Glebas é
+o primeiro. A plataforma nasceu do zero — nada de código, modelo de dados ou
+hábito de projeto anterior. O nome exibido vem de `PLATAFORMA_NOME`
+(padrão `Imovaluation`).
 
 | | onde | linguagem | como roda |
 |---|---|---|---|
@@ -43,7 +44,7 @@ teste. Nunca aponte essa variável para um banco com dados.
 
 Na prática: a página `/estudos/:id` é só a barra da casca e um `<iframe>` com
 `/m/<modulo>/index.html?casca`. A conversa é por `postMessage`, sempre no canal
-`'modelagens'` e sempre conferindo `origin` e `source` dos dois lados:
+`'imovaluation'` e sempre conferindo `origin` e `source` dos dois lados:
 
 ```
 módulo → casca   { canal, tipo: 'pronto', modulo }            ao carregar
